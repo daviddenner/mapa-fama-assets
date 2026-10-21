@@ -1,0 +1,4 @@
+<resources>
+    <!-- Tema simples baseado no Material 3, com suporte a tema claro/escuro. -->
+    <style name="Theme.Gravador" parent="Theme.Material3.DayNight" />
+</resources>

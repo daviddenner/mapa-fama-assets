@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tela principal, visível. É aqui que você inicia/para e configura tudo. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:textSize="22sp"
+            android:text="@string/status_parado" />
+
+        <TextView
+            android:id="@+id/levelText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:alpha="0.7"
+            android:text="nível: --" />
+
+        <Button
+            android:id="@+id/toggleButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/iniciar" />
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:layout_marginTop="24dp" android:background="#33000000" />
+
+        <!-- Opção: codec / qualidade -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="20dp" android:text="@string/cfg_codec" android:textStyle="bold" />
+        <Spinner
+            android:id="@+id/codecSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" />
+
+        <!-- Opção: cortar silêncios -->
+        <CheckBox
+            android:id="@+id/silenceCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/cfg_cortar_silencio" />
+
+        <!-- Opção: marcar GPS -->
+        <CheckBox
+            android:id="@+id/gpsCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/cfg_gps" />
+
+        <!-- Opção: nuvem / destino -->
+        <CheckBox
+            android:id="@+id/cloudCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/cfg_nuvem" />
+        <Button
+            android:id="@+id/pickFolderButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="?attr/materialButtonOutlinedStyle"
+            android:text="@string/cfg_escolher_pasta" />
+        <TextView
+            android:id="@+id/folderText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:alpha="0.7"
+            android:text="(nenhuma pasta escolhida)" />
+
+        <!-- Opção: apagar local após salvar -->
+        <CheckBox
+            android:id="@+id/deleteLocalCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/cfg_apagar_local" />
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:layout_marginTop="20dp" android:background="#33000000" />
+
+        <!-- Cerca virtual: avisar para gravar ao chegar num local -->
+        <CheckBox
+            android:id="@+id/geofenceCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/cfg_geofence" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:text="@string/geo_raio_label" />
+        <EditText
+            android:id="@+id/radiusInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:text="100" />
+
+        <Button
+            android:id="@+id/useLocationButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_marginTop="4dp"
+            android:text="@string/geo_usar_local" />
+        <TextView
+            android:id="@+id/geoStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:alpha="0.7"
+            android:text="(nenhum local definido)" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="12sp"
+            android:alpha="0.6"
+            android:text="@string/geo_aviso_raio" />
+
+        <!-- Isenção de bateria (conserto do "Android fecha") -->
+        <Button
+            android:id="@+id/batteryButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_marginTop="12dp"
+            android:text="@string/cfg_bateria" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:textSize="12sp"
+            android:alpha="0.7"
+            android:text="@string/aviso_consentimento" />
+    </LinearLayout>
+</ScrollView>

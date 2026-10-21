@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">Gravador de Áudio</string>
+    <string name="tile_label">Gravar</string>
+
+    <!-- Notificação do serviço em primeiro plano (sempre visível ao gravar). -->
+    <string name="canal_gravacao">Gravação</string>
+    <string name="canal_gravacao_desc">Aparece sempre que o microfone está ativo</string>
+    <string name="notif_gravando">Gravando áudio</string>
+    <string name="notif_ouvindo">Gravando (pausado no silêncio)</string>
+    <string name="notif_parar">Parar</string>
+
+    <!-- Tela principal -->
+    <string name="iniciar">Iniciar gravação</string>
+    <string name="parar">Parar gravação</string>
+    <string name="status_parado">Parado</string>
+    <string name="status_gravando">Gravando…</string>
+
+    <!-- Configurações -->
+    <string name="cfg_codec">Qualidade / codec</string>
+    <string name="cfg_nuvem">Salvar na nuvem (pasta do Drive)</string>
+    <string name="cfg_escolher_pasta">Escolher pasta de destino</string>
+    <string name="cfg_gps">Marcar a posição GPS na gravação</string>
+    <string name="cfg_cortar_silencio">Cortar silêncios durante a gravação</string>
+    <string name="cfg_apagar_local">Apagar do celular após salvar no destino</string>
+    <string name="cfg_bateria">Permitir rodar sem corte de bateria</string>
+
+    <string name="aviso_consentimento">Este aparelho está gravando. Avise quem está por perto e siga as regras de consentimento e a política da sua instituição.</string>
+
+    <!-- Canal e aviso da cerca virtual (chegada no local) -->
+    <string name="canal_aviso">Aviso de local</string>
+    <string name="canal_aviso_desc">Avisa quando você chega num local de gravação</string>
+    <string name="aviso_chegou_titulo">Você chegou num local de gravação</string>
+    <string name="aviso_chegou_texto">Toque em Gravar para começar</string>
+    <string name="aviso_gravar">Gravar</string>
+
+    <!-- Configuração da cerca virtual -->
+    <string name="cfg_geofence">Avisar para gravar ao chegar num local</string>
+    <string name="geo_usar_local">Definir usando minha localização atual</string>
+    <string name="geo_raio_label">Raio (metros)</string>
+    <string name="geo_aviso_raio">Dica: o GPS costuma errar de 10 a 30 m. Raios pequenos (ex.: 10 m) podem falhar; 100 m é mais confiável.</string>
+</resources>

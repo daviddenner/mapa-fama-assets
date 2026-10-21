@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Capturar áudio do microfone. Concedida pelo usuário em tempo de execução. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Efeitos de áudio (supressor de ruído da plataforma). -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <!-- Serviço em primeiro plano, visível, para o sistema não encerrar a gravação. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Android 14 exige declarar o TIPO do serviço. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+
+    <!-- Notificação fixa de "gravando" (Android 13+). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Marcar a gravação com a localização (opção "salvar posição GPS").
+         Concedida por você; só é usada se a opção estiver ligada. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Necessária para a cerca virtual (geofence) disparar com o app fechado. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- Manter a CPU ativa durante a gravação. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Pedir isenção da otimização de bateria (você aprova na tela).
+         ESTE é o conserto para o "Android fecha, ainda mais em economia de bateria". -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- NÃO há permissão de BOOT nem de INTERNET: o app não liga sozinho na
+         inicialização e não envia nada para servidores externos. O envio para a
+         nuvem é feito gravando numa pasta do Drive via SAF (o app do Drive cuida
+         da rede). -->
+
+    <application
+        android:name=".GravadorApp"
+        android:allowBackup="false"
+        android:icon="@drawable/ic_mic"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.Gravador">
+
+        <!-- Tela principal: iniciar/parar, status e todas as configurações. -->
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Serviço de gravação. O tipo "microphone" + a notificação fixa deixam
+             a gravação visível e protegida contra encerramento. -->
+        <service
+            android:name=".service.RecordingService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <!-- Atalho no painel de Ajustes Rápidos (puxar de cima): 1 toque inicia/para.
+             Para os atendimentos imprevisíveis, sem precisar abrir o app. -->
+        <service
+            android:name=".tile.RecordTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_mic"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Recebe o evento da cerca virtual (chegada no local) e mostra o aviso
+             "Gravar?". Não grava sozinho: veja o comentário em GeofenceBroadcastReceiver. -->
+        <receiver
+            android:name=".geofence.GeofenceBroadcastReceiver"
+            android:exported="false" />
+    </application>
+</manifest>
