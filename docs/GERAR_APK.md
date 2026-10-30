@@ -29,6 +29,9 @@ O código está no GitHub, na branch `ccr-b6dfa0e5-7pb28p`. Duas opções:
 
 - O Android Studio faz o **Gradle Sync** sozinho e **baixa as dependências**
   (precisa de internet). Pode levar alguns minutos na primeira vez.
+- O projeto já indica **Gradle 8.7**; o Android Studio baixa essa versão e
+  completa o "wrapper" sozinho no primeiro sync. Deixe ele terminar antes de
+  usar o terminal.
 - Se ele avisar que falta o **SDK 34** (Android 14), aceite instalar, ou vá em
   **Tools → SDK Manager** e marque o **Android 14 (API 34)**.
 - Se aparecer algum erro de versão de plugin/Gradle, ele costuma oferecer um
