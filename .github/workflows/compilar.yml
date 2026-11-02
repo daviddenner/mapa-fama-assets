@@ -1,0 +1,64 @@
+# Compila os firmwares com os pacotes oficiais (ESP8266 e ESP32) e roda os
+# testes no PC a cada envio. Se algo quebrar, aparece um X vermelho no GitHub.
+name: Compilar firmwares
+
+on:
+  push:
+    paths:
+      - "sino-gps/**"
+      - "teste-rede-esp32/**"
+      - ".github/workflows/compilar.yml"
+  workflow_dispatch:
+
+jobs:
+  testes-pc:
+    name: Testes no PC
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sino GPS
+        run: cd sino-gps/testes && g++ -std=c++17 -Wall -Wextra -I../sino_gps teste_logica.cpp -o teste && ./teste
+      - name: Teste de rede
+        run: cd teste-rede-esp32/testes && g++ -std=c++17 -Wall -Wextra -I../teste_rede teste_analise.cpp -o teste && ./teste
+
+  sino-esp8266:
+    name: Sino GPS (ESP8266)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/compile-sketches@v1
+        with:
+          fqbn: esp8266:esp8266:generic
+          platforms: |
+            - name: esp8266:esp8266
+              source-url: https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          libraries: "[]"
+          sketch-paths: |
+            - sino-gps/sino_gps
+
+  teste-rede-esp32:
+    name: Teste de rede (ESP32 ${{ matrix.versao }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        versao: ["2.0.17", "3.x"]
+        include:
+          - versao: "2.0.17"
+            plataforma: |
+              - name: esp32:esp32
+                source-url: https://espressif.github.io/arduino-esp32/package_esp32_index.json
+                version: 2.0.17
+          - versao: "3.x"
+            plataforma: |
+              - name: esp32:esp32
+                source-url: https://espressif.github.io/arduino-esp32/package_esp32_index.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/compile-sketches@v1
+        with:
+          fqbn: esp32:esp32:esp32
+          platforms: ${{ matrix.plataforma }}
+          libraries: "[]"
+          sketch-paths: |
+            - teste-rede-esp32/teste_rede
