@@ -56,6 +56,11 @@ struct Fonte {  // uma fonte de hora que funcionou
 Fonte fontes[20];
 uint8_t nFontes = 0;
 
+struct Alvo {  // servidor NTP a testar
+  IPAddress ip;
+  char rotulo[48];
+};
+
 struct Resultado {  // só tipos simples: pode ser zerado com memset
   bool rodou, associou, temIP, internet, dnsOk, dnsDesviado;
   int ultimoMotivo;
@@ -576,11 +581,6 @@ void refinarData(const char *url) {
 }
 
 // ============================================================ Teste completo
-struct Alvo {
-  IPAddress ip;
-  char rotulo[48];
-};
-
 void adicionarAlvo(Alvo *alvos, int &n, int max, const IPAddress &ip, const char *rotulo) {
   if (ipVazio(ip) || n >= max) return;
   for (int i = 0; i < n; i++)
