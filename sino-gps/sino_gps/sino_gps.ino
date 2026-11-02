@@ -2,25 +2,34 @@
 //  Sino escolar sincronizado por GPS
 //  ESP-12 (ESP8266) + GPS NEO-6M/NEO-M8N + RTC DS3231 + relé (sino 127 V)
 //
-//  Cada sino é independente: não usa Wi-Fi, roteador nem internet.
+//  O sino não depende de roteador nem de internet para tocar na hora certa:
 //  - O GPS dá a hora exata (a mesma para todos os sinos, com erro de milissegundos).
 //  - O DS3231 guarda a hora (com bateria) e mantém o sino funcionando quando
 //    o GPS fica sem sinal ou depois de uma queda de energia.
-//  - Os horários ficam em horarios.h; o resto da configuração em config.h.
+//  - Os horários são mudados por uma página no próprio sino (web.ino), aberta
+//    pela rede Wi-Fi do sino (nome oculto) ou pela rede da instituição.
+//    Ficam guardados na memória; horarios.h é só a tabela inicial.
+//  - O resto da configuração fica em config.h.
 //
 //  Placa na Arduino IDE: "Generic ESP8266 Module" (ou NodeMCU / Wemos D1 mini).
 //  Não precisa instalar nenhuma biblioteca além do pacote ESP8266.
 // ============================================================================
+#include <EEPROM.h>
+#include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
 #include <SoftwareSerial.h>
 #include <Wire.h>
 
 #include "agenda.h"
+#include "armazenamento.h"
 #include "config.h"
 #include "ds3231.h"
 #include "horarios.h"
 #include "nmea.h"
+#include "pagina.h"
 #include "tempo.h"
+#include "web_util.h"
 
 SoftwareSerial gpsSerial(PINO_GPS_RX, -1);  // só recebe do GPS
 LeitorNMEA nmea;
@@ -28,6 +37,8 @@ LeitorNMEA nmea;
 // Um relógio que diga uma data anterior à da compilação está errado.
 const uint32_t EPOCH_MINIMO = epochDaCompilacao(__DATE__);
 static const char *const NOME_DIA[] = {"dom", "seg", "ter", "qua", "qui", "sex", "sab"};
+
+Configuracao cfg;  // horários, senhas e rede (guardados na memória)
 
 // ----------------------------------------------------------------- Relógio
 bool rtcOk = false;           // DS3231 respondendo
@@ -48,6 +59,8 @@ bool mostrarNmea = false;
 
 bool syncPendente = false;
 bool syncEstavel = false;
+bool syncDoGps = true;  // false = acerto pela hora do celular (página)
+int filaNoDolar = 0;    // caracteres já na fila quando chegou o '$' da sentença
 uint32_t syncAlvoEpoch = 0;
 uint32_t syncAlvoMs = 0;
 bool jaSincronizouEstavel = false;
@@ -59,13 +72,44 @@ uint32_t ultimoSyncMs = 0;
 struct {
   bool ativo;
   bool releLigado;
+  bool aviso;  // ainda falta a batida curta do aviso sonoro
   uint8_t restantes;
   uint32_t duracao;
+  uint32_t pausa;
   uint32_t marco;
   uint32_t ligadoDesde;
 } toque;
 
 inline uint32_t paraLocal(uint32_t utc) { return utc + (int32_t)FUSO_MINUTOS * 60; }
+
+// ============================================================ Memória
+bool salvarConfig() {
+  selarConfig(cfg);
+  EEPROM.put(0, cfg);
+  return EEPROM.commit();
+}
+
+void configPadrao() {
+  memset(&cfg, 0, sizeof cfg);
+  cfg.nHorarios = NUM_HORARIOS;
+  memcpy(cfg.horarios, HORARIOS, sizeof(HORARIOS));
+  copiarTexto(cfg.apSenha, sizeof cfg.apSenha, AP_SENHA_PADRAO);
+  copiarTexto(cfg.adminSenha, sizeof cfg.adminSenha, ADMIN_SENHA_PADRAO);
+  copiarTexto(cfg.instNome, sizeof cfg.instNome, REDE_INST_NOME);
+  copiarTexto(cfg.instSenha, sizeof cfg.instSenha, REDE_INST_SENHA);
+}
+
+void carregarConfig() {
+  EEPROM.begin(sizeof(Configuracao));
+  EEPROM.get(0, cfg);
+  if (configValida(cfg)) {
+    Serial.printf("Configuracao lida da memoria: %u horarios\n", cfg.nHorarios);
+    return;
+  }
+  configPadrao();
+  salvarConfig();
+  Serial.println(F("Memoria vazia: usando os horarios de horarios.h e as senhas do config.h"));
+}
 
 void imprimirDataHora(uint32_t epochLocal) {
   const DataHora t = deEpoch(epochLocal);
@@ -80,15 +124,26 @@ void rele(bool ligar) {
   if (ligar) toque.ligadoDesde = millis();
 }
 
-void iniciarToque(uint32_t duracaoMs, uint8_t vezes) {
+void iniciarToque(uint32_t duracaoMs, uint8_t vezes, bool comAviso) {
   if (duracaoMs == 0) return;
   if (duracaoMs > DURACAO_MAX_MS) duracaoMs = DURACAO_MAX_MS;
   toque.ativo = true;
+  toque.aviso = comAviso;
   toque.restantes = vezes ? vezes : 1;
   toque.duracao = duracaoMs;
+  toque.pausa = INTERVALO_BATIDAS_MS;
   toque.marco = millis();
   rele(true);
 }
+
+// O relógio está há tempo demais sem ser acertado? (conta desde que ligou, se
+// ainda não acertou nenhuma vez)
+bool semAcertoHaMuitoTempo() {
+  const uint32_t desde = algumSyncGps ? ultimoSyncMs : 0;
+  return millis() - desde > ALERTA_SEM_GPS_H * 3600000UL;
+}
+
+bool avisoSonoroAtivo() { return AVISO_SONORO && semAcertoHaMuitoTempo(); }
 
 void atualizarToque() {
   const uint32_t agora = millis();
@@ -103,10 +158,19 @@ void atualizarToque() {
     if (agora - toque.marco >= toque.duracao) {
       rele(false);
       toque.marco += toque.duracao;
-      if (--toque.restantes == 0) toque.ativo = false;
+      if (--toque.restantes == 0) {
+        if (toque.aviso) {  // aviso sonoro: pausa curta e uma batida curta
+          toque.aviso = false;
+          toque.restantes = 1;
+          toque.duracao = AVISO_BATIDA_MS;
+          toque.pausa = AVISO_PAUSA_MS;
+        } else {
+          toque.ativo = false;
+        }
+      }
     }
-  } else if (agora - toque.marco >= INTERVALO_BATIDAS_MS) {
-    toque.marco += INTERVALO_BATIDAS_MS;
+  } else if (agora - toque.marco >= toque.pausa) {
+    toque.marco += toque.pausa;
     rele(true);
   }
 }
@@ -134,8 +198,9 @@ void imprimirStatus() {
   } else {
     Serial.print(F("nenhum desde que ligou"));
   }
+  if (avisoSonoroAtivo()) Serial.print(F(" | AVISO SONORO LIGADO"));
   if (horaValida) {
-    const uint32_t prox = proximoToque(HORARIOS, NUM_HORARIOS, paraLocal(epochUtc));
+    const uint32_t prox = proximoToque(cfg.horarios, cfg.nHorarios, paraLocal(epochUtc));
     if (prox) {
       Serial.print(F(" | proximo toque: "));
       imprimirDataHora(prox);
@@ -145,9 +210,9 @@ void imprimirStatus() {
 }
 
 void listarHorarios() {
-  Serial.printf("%u horarios (hora local, fuso %d min):\n", NUM_HORARIOS, FUSO_MINUTOS);
-  for (uint8_t i = 0; i < NUM_HORARIOS; i++) {
-    const Toque &h = HORARIOS[i];
+  Serial.printf("%u horarios (hora local, fuso %d min):\n", cfg.nHorarios, FUSO_MINUTOS);
+  for (uint8_t i = 0; i < cfg.nHorarios; i++) {
+    const Toque &h = cfg.horarios[i];
     Serial.printf("  %02u:%02u  %5u ms x%u  ", h.hora, h.minuto, h.duracaoMs, h.vezes);
     for (uint8_t d = 0; d < 7; d++)
       if (h.dias & (1 << d)) Serial.printf("%s ", NOME_DIA[d]);
@@ -162,6 +227,8 @@ void ajuda() {
   Serial.println(F("  toque                        toque de teste"));
   Serial.println(F("  gps                          liga/desliga a exibicao do NMEA cru"));
   Serial.println(F("  hora AAAA-MM-DD HH:MM:SS     acerta a hora local na mao (teste)"));
+  Serial.println(F("  wifi                         rede do sino, rede da instituicao e MAC"));
+  Serial.println(F("  senhas-padrao                volta as senhas do config.h e reinicia"));
 }
 
 // =================================================================== Relógio
@@ -189,11 +256,13 @@ void novoSegundo() {
     return;
   }
   const uint32_t local = paraLocal(epochUtc);
-  const int i = verificarAgenda(HORARIOS, NUM_HORARIOS, local, ultimoMinutoTocado, JANELA_TOQUE_S);
+  const int i = verificarAgenda(cfg.horarios, cfg.nHorarios, local, ultimoMinutoTocado, JANELA_TOQUE_S);
   if (i >= 0) {
-    iniciarToque(HORARIOS[i].duracaoMs, HORARIOS[i].vezes);
+    const bool aviso = avisoSonoroAtivo();
+    iniciarToque(cfg.horarios[i].duracaoMs, cfg.horarios[i].vezes, aviso);
     Serial.print(F(">>> TOQUE "));
     imprimirDataHora(local);
+    if (aviso) Serial.print(F("  (com aviso sonoro: relogio sem acerto ha muito tempo)"));
     Serial.println();
   }
   if (local % 60 == 0) imprimirStatus();
@@ -233,6 +302,8 @@ void processarRmc(const LeituraRMC &rmc, uint32_t inicioMs) {
     Serial.println(F("GPS: sinal OK"));
   }
 
+  if (filaNoDolar > 40) return;  // o laço atrasou demais: a hora de chegada não é confiável
+
   const bool estavel = segundosComFix >= GPS_ESTAVEL_MIN * 60UL;
   const bool precisa =
       !horaValida || horaManual ||
@@ -245,6 +316,7 @@ void processarRmc(const LeituraRMC &rmc, uint32_t inicioMs) {
   syncAlvoEpoch = utc + 1 + desde / 1000;
   syncAlvoMs = inicioMs + (1000 - desde % 1000);
   syncEstavel = estavel;
+  syncDoGps = true;
   syncPendente = true;
 }
 
@@ -266,11 +338,19 @@ void executarSyncPendente() {
     return;
   }
   horaValida = true;
+  proximaLeituraRtcMs = millis();  // lê o RTC de novo já
+  if (!syncDoGps) {  // acerto pela hora do aparelho (página)
+    horaManual = true;
+    ultimoMinutoTocado = paraLocal(syncAlvoEpoch) / 60;  // não toca no minuto do acerto
+    Serial.print(F("RTC acertado pela hora do aparelho: "));
+    imprimirDataHora(paraLocal(syncAlvoEpoch));
+    Serial.println();
+    return;
+  }
   horaManual = false;
   algumSyncGps = true;
   ultimoSyncMs = millis();
   if (syncEstavel) jaSincronizouEstavel = true;
-  proximaLeituraRtcMs = millis();  // lê o RTC de novo já
 
   Serial.print(F("RTC acertado pelo GPS: "));
   imprimirDataHora(paraLocal(syncAlvoEpoch));
@@ -287,10 +367,17 @@ void executarSyncPendente() {
 void lerGps() {
   while (gpsSerial.available()) {
     const char c = gpsSerial.read();
+    uint32_t agora = millis();
+    if (c == '$') {
+      // Se o laço demorou (ex.: enviando a página), o '$' chegou antes de ser lido:
+      // desconta o tempo dos caracteres que já estão na fila (10 bits cada).
+      filaNoDolar = gpsSerial.available();
+      agora -= (uint32_t)filaNoDolar * 10000UL / GPS_BAUD;
+    }
     if (mostrarNmea) Serial.write(c);
     LeituraRMC rmc;
     uint32_t inicioMs;
-    if (nmea.alimentar(c, millis(), rmc, inicioMs)) processarRmc(rmc, inicioMs);
+    if (nmea.alimentar(c, agora, rmc, inicioMs)) processarRmc(rmc, inicioMs);
   }
   if (nmea.sentencasOk != contagemSentencas) {
     contagemSentencas = nmea.sentencasOk;
@@ -335,7 +422,7 @@ void atualizarBotao() {
     estado = lido;
     if (estado) {
       Serial.println(F("Botao: toque de teste"));
-      iniciarToque(DURACAO_TESTE_MS, 1);
+      iniciarToque(DURACAO_TESTE_MS, 1, false);
     }
   }
 }
@@ -375,11 +462,20 @@ void executarComando(const char *cmd) {
     listarHorarios();
   } else if (!strcmp(cmd, "toque")) {
     Serial.println(F("Toque de teste"));
-    iniciarToque(DURACAO_TESTE_MS, 1);
+    iniciarToque(DURACAO_TESTE_MS, 1, false);
   } else if (!strcmp(cmd, "gps")) {
     mostrarNmea = !mostrarNmea;
   } else if (!strncmp(cmd, "hora ", 5)) {
     acertarNaMao(cmd + 5);
+  } else if (!strcmp(cmd, "wifi")) {
+    imprimirRede();
+  } else if (!strcmp(cmd, "senhas-padrao")) {
+    copiarTexto(cfg.apSenha, sizeof cfg.apSenha, AP_SENHA_PADRAO);
+    copiarTexto(cfg.adminSenha, sizeof cfg.adminSenha, ADMIN_SENHA_PADRAO);
+    salvarConfig();
+    Serial.println(F("Senhas do Wi-Fi e da pagina voltaram as do config.h. Reiniciando..."));
+    delay(200);
+    ESP.restart();
   } else {
     ajuda();
   }
@@ -409,11 +505,6 @@ void setup() {
   digitalWrite(PINO_LED, HIGH);
   pinMode(PINO_BOTAO_TESTE, INPUT_PULLUP);
 
-  // Rádio desligado: o sino não depende de rede nenhuma.
-  WiFi.persistent(false);
-  WiFi.mode(WIFI_OFF);
-  WiFi.forceSleepBegin();
-
   Serial.begin(115200);
   gpsSerial.begin(GPS_BAUD);
   Wire.begin(PINO_SDA, PINO_SCL);
@@ -422,12 +513,16 @@ void setup() {
 
   Serial.println();
   Serial.println(F("=== Sino GPS ==="));
+  carregarConfig();
   verificarRtc();
   if (horaValida) {
     // Se o ESP reiniciou no meio de um toque, não toca de novo no mesmo minuto.
     ultimoMinutoTocado = paraLocal(epochUtc) / 60;
     imprimirStatus();
   }
+  iniciarRede();
+  iniciarWeb();
+  imprimirRede();
   ajuda();
 }
 
@@ -439,6 +534,7 @@ void loop() {
   atualizarBotao();
   atualizarLed();
   lerSerial();
+  atualizarWeb();
 
   static uint32_t ultimoAvisoMs = 0;  // sem hora: mostra o estado a cada 10 s
   if (!horaValida && millis() - ultimoAvisoMs >= 10000) {

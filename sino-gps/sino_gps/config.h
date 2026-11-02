@@ -46,4 +46,38 @@
 #define GPS_ESTAVEL_MIN 15
 
 #define INTERVALO_SYNC_MIN 60  // de quanto em quanto tempo o GPS corrige o RTC
-#define ALERTA_SEM_GPS_H 6     // LED avisa se ficou este tempo sem acerto pelo GPS
+#define ALERTA_SEM_GPS_H 6     // LED (e o aviso sonoro) avisam se ficou este tempo sem acerto
+
+// ----------------------------------------------------------- Aviso sonoro
+// Se o relógio ficar mais de ALERTA_SEM_GPS_H horas sem ser acertado (GPS sem
+// sinal), cada toque dos horários ganha uma batida curta no fim:
+//   toque normal ... pausa de 0,5 s ... batida de 0,5 s
+// Quem ouvir sabe que é preciso olhar o sino. O sino continua na hora certa
+// pelo DS3231; o aviso some sozinho quando o GPS volta a acertar o relógio.
+#define AVISO_SONORO 1  // 0 = sem aviso sonoro
+#define AVISO_PAUSA_MS 500
+#define AVISO_BATIDA_MS 500
+
+// --------------------------------------------------------- Wi-Fi e página
+// O sino cria uma rede Wi-Fi própria, sempre ligada e com o nome OCULTO.
+// Para abrir a página: no celular/notebook, "adicionar rede" manualmente com
+// este nome e senha, e depois abrir http://192.168.4.1
+#define AP_NOME "SINO-IFMS-01"         // um nome diferente para cada sino
+#define AP_SENHA_PADRAO "troque-esta-senha"  // mínimo 8 caracteres (dá para trocar na página)
+#define AP_OCULTO 1                    // 1 = o nome não aparece na lista de redes
+#define AP_CANAL 6
+
+// Login da página (o usuário é fixo; a senha dá para trocar na própria página).
+#define ADMIN_USUARIO "admin"
+#define ADMIN_SENHA_PADRAO "troque-tambem"
+
+// Rede da instituição (opcional). Também dá para configurar pela página.
+// Quando o MAC do sino estiver cadastrado, a página abre também por ela, em
+// http://NOME_NA_REDE.local ou pelo IP que aparece na página.
+#define REDE_INST_NOME ""
+#define REDE_INST_SENHA ""
+#define NOME_NA_REDE "sino-ifms-01"
+
+// Se a rede da instituição não conectar em 30 s, desiste e tenta de novo
+// depois deste tempo (enquanto tenta, a rede própria do sino oscila um pouco).
+#define REDE_INST_ESPERA_MIN 10
