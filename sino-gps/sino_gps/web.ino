@@ -204,6 +204,7 @@ void apiHorarios() {
     }
     memcpy(cfg.horarios, nova, sizeof(Toque) * n);
     cfg.nHorarios = (uint8_t)n;
+    if (horaValida) ultimoMinutoTocado = paraLocal(epochUtc) / 60;  // horário deste minuto já passou
     if (!salvarConfig()) {
       servidor.send(500, "text/plain; charset=utf-8", "Nao consegui gravar na memoria do sino.");
       return;

@@ -27,9 +27,11 @@
 #define DURACAO_MAX_MS 30000       // segurança: o relé nunca fica ligado mais que isto
 #define DURACAO_TESTE_MS 2000      // toque do botão de teste / comando "toque"
 
-// Se o relógio for corrigido bem em cima do horário (pulo de 1-2 s), o toque
-// ainda acontece se estivermos até este número de segundos depois do horário.
-#define JANELA_TOQUE_S 5
+// O toque ainda acontece se o sino só "perceber" o horário até este número de
+// segundos depois (ex.: relógio corrigido bem em cima do horário, ou o ESP
+// ocupado alguns segundos atendendo um aparelho lento na página). Melhor tocar
+// um pouco atrasado do que não tocar.
+#define JANELA_TOQUE_S 30
 
 // ------------------------------------------------------------------------ GPS
 #define GPS_BAUD 9600
