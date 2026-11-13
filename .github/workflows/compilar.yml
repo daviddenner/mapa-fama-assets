@@ -7,6 +7,7 @@ on:
     paths:
       - "sino-gps/**"
       - "teste-rede-esp32/**"
+      - "hardware/**"
       - ".github/workflows/compilar.yml"
   workflow_dispatch:
 
@@ -26,6 +27,17 @@ jobs:
         run: cd sino-gps/testes && g++ -std=c++17 -Wall -Wextra -I../sino_gps teste_web.cpp -o teste_web && ./teste_web
       - name: Teste de rede
         run: cd teste-rede-esp32/testes && g++ -std=c++17 -Wall -Wextra -I../teste_rede teste_analise.cpp -o teste && ./teste
+
+  esquema:
+    name: Esquema (Eagle)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gerar e conferir o esquema
+        run: |
+          cd hardware
+          python3 gerar_esquema.py
+          git diff --exit-code -- Sino_IFMS_v2.sch esquema.svg
 
   sino-esp8266:
     name: Sino GPS (ESP8266)

@@ -52,7 +52,7 @@ eles, tocam juntos, com diferença de poucos milissegundos.
 
 | Item | Observação |
 |---|---|
-| ESP-12E/F, relé e fonte | os mesmos da versão Wi-Fi |
+| NodeMCU (ESP-12E), relé 5 V com BC548 e fonte 5 V | esquema completo em [`../hardware`](../hardware) |
 | Módulo GPS **GY-NEO6MV2** (NEO-6M) ou NEO-M8N | **use o mesmo modelo em todos os sinos** |
 | Módulo RTC **DS3231** (ZS-042) + bateria CR2032 | |
 | Botão (opcional) | toque de teste na mão |
@@ -61,23 +61,26 @@ eles, tocam juntos, com diferença de poucos milissegundos.
 
 ## Ligações
 
+O esquema completo da placa (NodeMCU, DS3231, relé com BC548, fonte de 5 V,
+saída de 127 V) está em [`../hardware`](../hardware). Resumo:
+
 | Módulo | Pino | Liga em |
 |---|---|---|
 | GPS | VCC | 3,3 V ou 5 V (o módulo tem regulador) |
 | GPS | GND | GND |
-| GPS | TX | **GPIO14** |
+| GPS (opcional) | TX | **GPIO14 (D5)** |
 | GPS | RX | não ligar |
 | DS3231 | VCC | **3,3 V** |
 | DS3231 | GND | GND |
-| DS3231 | SDA | **GPIO4** |
-| DS3231 | SCL | **GPIO5** |
-| Relé | IN | **GPIO12** |
-| Botão de teste | um lado | **GPIO13** |
+| DS3231 | SDA | **GPIO4 (D2)** |
+| DS3231 | SCL | **GPIO5 (D1)** |
+| Relé | via R1 1 kΩ + BC548 | **GPIO12 (D6)** |
+| Botão de teste | um lado | **GPIO13 (D7)** |
 | Botão de teste | outro lado | GND |
 
-Os resistores de boot do ESP-12 continuam como na versão atual: EN, RST, GPIO0
-e GPIO2 em 3,3 V (10 kΩ) e GPIO15 em GND (10 kΩ). O LED azul do próprio ESP-12
-(GPIO2) mostra o estado do sino.
+Com o NodeMCU, os resistores de boot já estão na placa. Com um ESP-12 avulso:
+EN, RST, GPIO0 e GPIO2 em 3,3 V (10 kΩ) e GPIO15 em GND (10 kΩ). O LED azul do
+próprio ESP-12 (GPIO2, D4) mostra o estado do sino.
 
 > **DS3231 (ZS-042):** alimente com **3,3 V**. Esse módulo tem um circuito que
 > "carrega" a bateria. Com 3,3 V ele não faz nada, mas com 5 V ele carrega a
@@ -89,7 +92,9 @@ e GPIO2 em 3,3 V (10 kΩ) e GPIO15 em GND (10 kΩ). O LED azul do próprio ESP-1
 1. Abra `sino_gps/sino_gps.ino` na Arduino IDE (com o pacote ESP8266 que você
    já usa). Não precisa instalar nenhuma biblioteca.
 2. Em **`config.h`**:
-   - `RELE_ATIVO_EM_BAIXO`: o mesmo comportamento do relé da versão atual;
+   - `RELE_ATIVO_EM_BAIXO`: `false` para a placa do esquema (`hardware/`, relé
+     pelo BC548). Use `true` só com módulo relé que liga em 0 V. Errar isto
+     deixa o sino tocando sem parar;
    - `AP_NOME`: o nome do Wi-Fi deste sino (um nome diferente para cada sino,
      ex.: `SINO-IFMS-01`, `SINO-IFMS-02`);
    - `AP_SENHA_PADRAO` e `ADMIN_SENHA_PADRAO`: senhas iniciais do Wi-Fi e da

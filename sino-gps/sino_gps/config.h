@@ -10,17 +10,19 @@
 
 // ------------------------------------------------------------- Pinos (ESP-12)
 // Evite GPIO0, GPIO2 e GPIO15 para o relé: eles mudam de estado no boot.
-#define PINO_RELE 12         // GPIO12 -> IN do módulo relé
-#define PINO_GPS_RX 14       // GPIO14 <- TX do módulo GPS
-#define PINO_SDA 4           // GPIO4  <-> SDA do DS3231
-#define PINO_SCL 5           // GPIO5  ->  SCL do DS3231
-#define PINO_BOTAO_TESTE 13  // GPIO13 -> botão até o GND (toque manual). Opcional.
-#define PINO_LED 2           // GPIO2: LED azul do próprio ESP-12 (acende em LOW)
+// Nomes do NodeMCU entre parênteses (é a placa do esquema em hardware/).
+#define PINO_RELE 12         // GPIO12 (D6) -> resistor de base do BC548 (ou IN do módulo relé)
+#define PINO_GPS_RX 14       // GPIO14 (D5) <- TX do módulo GPS (opcional)
+#define PINO_SDA 4           // GPIO4  (D2) <-> SDA do DS3231
+#define PINO_SCL 5           // GPIO5  (D1) ->  SCL do DS3231
+#define PINO_BOTAO_TESTE 13  // GPIO13 (D7) -> botão até o GND (toque manual). Opcional.
+#define PINO_LED 2           // GPIO2  (D4): LED azul do próprio ESP-12 (acende em LOW)
 
-// Use o mesmo valor da versão Wi-Fi que já funciona aí:
-//   true  = o relé liga quando o pino vai a 0 V (maioria dos módulos com optoacoplador)
-//   false = o relé liga quando o pino vai a 3,3 V (jumper "H" / módulo com transistor / SSR)
-#define RELE_ATIVO_EM_BAIXO true
+// Como o relé é acionado. ERRAR ISTO DEIXA O SINO TOCANDO SEM PARAR.
+//   false = o relé liga quando o pino vai a 3,3 V: placa do esquema (BC548),
+//           módulo relé com jumper "H", módulo com transistor ou SSR
+//   true  = o relé liga quando o pino vai a 0 V (módulo relé com optoacoplador)
+#define RELE_ATIVO_EM_BAIXO false
 
 // --------------------------------------------------------------------- Toques
 #define INTERVALO_BATIDAS_MS 1000  // pausa entre batidas quando "vezes" > 1
