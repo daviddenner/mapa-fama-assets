@@ -50,14 +50,30 @@
 #define GPS_ESTAVEL_MIN 15
 
 #define INTERVALO_SYNC_MIN 60  // de quanto em quanto tempo o GPS corrige o RTC
-#define ALERTA_SEM_GPS_H 6     // LED (e o aviso sonoro) avisam se ficou este tempo sem acerto
+
+// ------------------------------------------------------ Hora pela rede (NTP)
+// Com a rede da instituição conectada, o sino confere a hora num servidor NTP
+// a cada INTERVALO_NTP_MIN e corrige o DS3231 se a diferença passar de
+// NTP_CORRIGE_ACIMA_MS. Quando a rede cai, o DS3231 segura a hora (erro de
+// poucos segundos por mês). Ordem de tentativa: o servidor digitado na página,
+// o informado pelo DHCP da rede e estes:
+#define NTP_SERVIDOR_1 "a.ntp.br"
+#define NTP_SERVIDOR_2 "b.ntp.br"
+#define NTP_SERVIDOR_3 "pool.ntp.br"
+#define INTERVALO_NTP_MIN 10
+#define NTP_CORRIGE_ACIMA_MS 20
+
+// O relógio precisa ser conferido (pela rede ou pelo GPS) pelo menos a cada
+// ALERTA_SEM_ACERTO_MIN. Passou disso (ex.: rede fora), o LED pisca 2 vezes por
+// segundo e liga o aviso sonoro.
+#define ALERTA_SEM_ACERTO_MIN 30
 
 // ----------------------------------------------------------- Aviso sonoro
-// Se o relógio ficar mais de ALERTA_SEM_GPS_H horas sem ser acertado (GPS sem
-// sinal), cada toque dos horários ganha uma batida curta no fim:
+// Se o relógio ficar mais de ALERTA_SEM_ACERTO_MIN sem ser conferido (rede
+// fora), cada toque dos horários ganha uma batida curta no fim:
 //   toque normal ... pausa de 0,5 s ... batida de 0,5 s
 // Quem ouvir sabe que é preciso olhar o sino. O sino continua na hora certa
-// pelo DS3231; o aviso some sozinho quando o GPS volta a acertar o relógio.
+// pelo DS3231; o aviso some sozinho quando a rede volta e a hora é conferida.
 #define AVISO_SONORO 1  // 0 = sem aviso sonoro
 #define AVISO_PAUSA_MS 500
 #define AVISO_BATIDA_MS 500

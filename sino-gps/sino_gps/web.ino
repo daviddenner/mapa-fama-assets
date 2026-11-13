@@ -39,6 +39,8 @@ void iniciarRede() {
   WiFi.persistent(false);  // não grava nada da rede na flash por conta própria
   WiFi.setAutoReconnect(false);
   WiFi.mode(WIFI_AP_STA);
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);  // sem economia de energia: a hora da rede chega sem atraso
+  sntp_servermode_dhcp(1);             // aceita o servidor de hora informado pelo DHCP
   WiFi.hostname(NOME_NA_REDE);
   if (!WiFi.softAP(AP_NOME, cfg.apSenha, AP_CANAL, AP_OCULTO, 4)) {
     Serial.println(F("ERRO ao criar a rede do sino; usando a senha padrao do config.h"));
@@ -55,6 +57,7 @@ void atualizarRede() {
         estadoInst = INST_CONECTADA;
         Serial.printf("Rede da instituicao: conectado, pagina tambem em http://%s ou http://%s.local\n",
                       WiFi.localIP().toString().c_str(), NOME_NA_REDE);
+        ntpConferirAgora();  // confere a hora assim que a rede volta
       } else if (millis() - marcoInstMs > 30000UL) {
         WiFi.disconnect();  // para de procurar: a rede do sino fica estável
         estadoInst = INST_ESPERANDO;
@@ -78,6 +81,8 @@ void atualizarRede() {
       break;
   }
 }
+
+bool instConectada() { return estadoInst == INST_CONECTADA; }
 
 const char *textoInst() {
   if (!cfg.instNome[0]) return "nao configurada";
@@ -155,19 +160,20 @@ void paginaInicial() {
 
 void apiEstado() {
   if (!autorizado()) return;
-  char ap[70], inst[70], prox[48], ip[20] = "", nome[40];
+  char ap[70], inst[70], prox[48], ip[20] = "", nome[40], ntpServ[100], ntpTxt[96], ntp[200];
   jsonTexto(ap, sizeof ap, AP_NOME);
   jsonTexto(inst, sizeof inst, cfg.instNome);
   jsonTexto(nome, sizeof nome, NOME_NA_REDE);
+  jsonTexto(ntpServ, sizeof ntpServ, cfg.ntpServidor);
+  textoNtp(ntpTxt, sizeof ntpTxt);
+  jsonTexto(ntp, sizeof ntp, ntpTxt);
   if (estadoInst == INST_CONECTADA) snprintf(ip, sizeof ip, "%s", WiFi.localIP().toString().c_str());
 
-  const char *estado = (!rtcOk || !horaValida) ? "semhora"
-                       : (!algumSyncGps || millis() - ultimoSyncMs > ALERTA_SEM_GPS_H * 3600000UL) ? "rtc"
-                                                                                                   : "ok";
+  const char *estado = (!rtcOk || !horaValida) ? "semhora" : horaConfirmadaRecente() ? "ok" : "rtc";
   const char *gps = millis() - ultimoDadoGpsMs > 3000 ? "sem dados (confira a ligacao do GPS)"
                     : gpsComSinal                       ? "com sinal"
                                                         : "procurando satelites";
-  const long sync = algumSyncGps ? (long)((millis() - ultimoSyncMs) / 60000UL) : -1L;
+  const long sync = algumaConfirmacao ? (long)((millis() - ultimaConfirmacaoMs) / 60000UL) : -1L;
   const uint32_t local = paraLocal(epochUtc);
   uint32_t fracao = millis() - inicioSegundoMs;
   if (fracao > 999) fracao = 999;
@@ -179,14 +185,17 @@ void apiEstado() {
       snprintf(prox, sizeof prox, "%02u:%02u (%s, %02u/%02u)", t.hora, t.min, NOME_DIA[t.diaSemana], t.dia, t.mes);
     }
   }
-  char json[700];
+  char json[1000];
   snprintf(json, sizeof json,
            "{\"token\":\"%s\",\"nome\":\"%s\",\"valida\":%s,\"manual\":%s,\"agora\":%lu.%03lu,\"estado\":\"%s\","
-           "\"tocando\":%s,\"gps\":\"%s\",\"sync\":%ld,\"proximo\":\"%s\",\"ap\":\"%s\",\"apClientes\":%u,"
-           "\"inst\":\"%s\",\"instEstado\":\"%s\",\"instIp\":\"%s\",\"aviso\":%s}",
+           "\"tocando\":%s,\"gps\":\"%s\",\"gpsVisto\":%s,\"sync\":%ld,\"fonte\":\"%s\",\"ntp\":\"%s\","
+           "\"ntpServ\":\"%s\",\"proximo\":\"%s\",\"ap\":\"%s\",\"apClientes\":%u,"
+           "\"inst\":\"%s\",\"instEstado\":\"%s\",\"instIp\":\"%s\",\"aviso\":%s,\"alertaMin\":%d}",
            tokenSessao, nome, horaValida ? "true" : "false", horaManual ? "true" : "false", (unsigned long)local,
-           (unsigned long)fracao, estado, toque.releLigado ? "true" : "false", gps, sync, prox, ap,
-           WiFi.softAPgetStationNum(), inst, textoInst(), ip, avisoSonoroAtivo() ? "true" : "false");
+           (unsigned long)fracao, estado, toque.releLigado ? "true" : "false", gps, gpsVisto() ? "true" : "false",
+           sync, algumaConfirmacao ? NOME_FONTE[ultimaFonte] : "", ntp, ntpServ, prox, ap,
+           WiFi.softAPgetStationNum(), inst, textoInst(), ip, avisoSonoroAtivo() ? "true" : "false",
+           ALERTA_SEM_ACERTO_MIN);
   servidor.sendHeader("Cache-Control", "no-store");
   servidor.send(200, "application/json", json);
 }
@@ -237,7 +246,7 @@ void apiHora() {
   // grava no começo do próximo segundo, para o RTC ficar em fase
   syncAlvoEpoch = utc + 1;
   syncAlvoMs = millis() + (uint32_t)(1000 - ms % 1000);
-  syncDoGps = false;
+  syncFonte = FONTE_MANUAL;
   syncPendente = true;
   Serial.println(F("Pagina: hora acertada pela hora do aparelho (o GPS corrige quando tiver sinal)"));
   servidor.send(200, "text/plain; charset=utf-8", "ok");
@@ -250,7 +259,10 @@ void apiRede() {
   const String &instSenha = servidor.arg("instSenha");
   const String &apSenha = servidor.arg("apSenha");
   const String &adminSenha = servidor.arg("adminSenha");
-  if (instNome.length() > 32 || instSenha.length() > 64 || apSenha.length() > 63 || adminSenha.length() > 32) {
+  String ntpServidor = servidor.arg("ntpServidor");
+  ntpServidor.trim();
+  if (instNome.length() > 32 || instSenha.length() > 64 || apSenha.length() > 63 || adminSenha.length() > 32 ||
+      ntpServidor.length() > 47) {
     servidor.send(400, "text/plain; charset=utf-8", "Texto longo demais.");
     return;
   }
@@ -267,6 +279,7 @@ void apiRede() {
   if (trocouRede || instSenha.length()) copiarTexto(cfg.instSenha, sizeof cfg.instSenha, instSenha.c_str());
   if (apSenha.length()) copiarTexto(cfg.apSenha, sizeof cfg.apSenha, apSenha.c_str());
   if (adminSenha.length()) copiarTexto(cfg.adminSenha, sizeof cfg.adminSenha, adminSenha.c_str());
+  copiarTexto(cfg.ntpServidor, sizeof cfg.ntpServidor, ntpServidor.c_str());
   if (!salvarConfig()) {
     servidor.send(500, "text/plain; charset=utf-8", "Nao consegui gravar na memoria do sino.");
     return;

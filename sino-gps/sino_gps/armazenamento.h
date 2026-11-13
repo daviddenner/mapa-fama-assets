@@ -3,11 +3,12 @@
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "horarios.h"
 
-const uint32_t MARCA_CONFIG = 0x53494E31;  // "SIN1": muda se o formato mudar
+const uint32_t MARCA_CONFIG = 0x53494E32;  // "SIN2": muda se o formato mudar
 
 struct Configuracao {
   uint32_t marca;
@@ -17,6 +18,7 @@ struct Configuracao {
   char adminSenha[33];  // senha da página
   char instNome[33];    // rede da instituição (vazio = não usa)
   char instSenha[65];
+  char ntpServidor[48];  // servidor de hora (vazio = automático)
   uint32_t crc;         // confere se o que está na memória não corrompeu
 };
 
@@ -36,7 +38,8 @@ inline uint32_t crcConfig(const Configuracao &c) {
 inline bool configValida(const Configuracao &c) {
   return c.marca == MARCA_CONFIG && c.nHorarios <= MAX_HORARIOS && c.crc == crcConfig(c) &&
          memchr(c.apSenha, 0, sizeof c.apSenha) && memchr(c.adminSenha, 0, sizeof c.adminSenha) &&
-         memchr(c.instNome, 0, sizeof c.instNome) && memchr(c.instSenha, 0, sizeof c.instSenha);
+         memchr(c.instNome, 0, sizeof c.instNome) && memchr(c.instSenha, 0, sizeof c.instSenha) &&
+         memchr(c.ntpServidor, 0, sizeof c.ntpServidor);
 }
 
 inline void selarConfig(Configuracao &c) {
@@ -45,6 +48,5 @@ inline void selarConfig(Configuracao &c) {
 }
 
 inline void copiarTexto(char *dst, size_t tam, const char *src) {
-  strncpy(dst, src, tam - 1);
-  dst[tam - 1] = 0;
+  snprintf(dst, tam, "%s", src);  // corta se não couber, sempre termina com '\0'
 }

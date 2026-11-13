@@ -66,7 +66,7 @@ td.dias{grid-column:1/-1;order:5}td:nth-child(5){justify-self:end}.num{width:52p
 
 <section>
 <h2>Relógio</h2>
-<p class="suave">O GPS acerta o relógio sozinho. Use o botão só se o GPS ainda não pegou sinal; quando ele pegar, corrige.</p>
+<p class="suave">A rede acerta o relógio sozinha. Use o botão só se a rede ainda não estiver funcionando; quando ela voltar, corrige.</p>
 <div class="botoes"><button id="btHora">Acertar pela hora deste aparelho</button><span id="msgHora" class="msg"></span></div>
 </section>
 
@@ -75,6 +75,7 @@ td.dias{grid-column:1/-1;order:5}td:nth-child(5){justify-self:end}.num{width:52p
 <div id="redeInfo" class="suave"></div>
 <label class="campo">Rede Wi-Fi da instituição (vazio = não usar)<input id="instNome" maxlength="32" autocomplete="off"></label>
 <label class="campo">Senha da rede da instituição (vazio = manter a atual)<input id="instSenha" type="password" maxlength="64" autocomplete="new-password"></label>
+<label class="campo">Servidor de hora (NTP), se a TI indicar um (vazio = automático)<input id="ntpServ" maxlength="47" autocomplete="off" placeholder="automático: DHCP, a.ntp.br"></label>
 <label class="campo">Nova senha do Wi-Fi do sino (mínimo 8; vazio = manter)<input id="apSenha" type="password" maxlength="63" autocomplete="new-password"></label>
 <label class="campo">Nova senha desta página (mínimo 6; vazio = manter)<input id="adminSenha" type="password" maxlength="32" autocomplete="new-password"></label>
 <div class="botoes"><button id="btRede" class="prim">Salvar e reiniciar o sino</button><span id="msgRede" class="msg"></span></div>
@@ -130,14 +131,20 @@ function estado(){fetch("/api/estado").then(function(r){if(!r.ok)throw 0;return 
  if(!e.valida){s.textContent="SEM HORA: não vai tocar";s.className="selo semhora";difRelogio=null;$("hora").textContent="--:--:--";$("data").textContent=""}
  else{difRelogio=e.agora*1000-Date.now();tique();
   if(e.tocando){s.textContent="tocando";s.className="selo ok"}
-  else if(e.estado=="ok"){s.textContent="GPS ok";s.className="selo ok"}
+  else if(e.estado=="ok"){s.textContent="hora conferida";s.className="selo ok"}
   else{s.textContent=e.manual?"hora acertada à mão":"só o relógio interno";s.className="selo rtc"}}
- $("gps").textContent="GPS: "+e.gps+(e.sync>=0?" · último acerto há "+e.sync+" min":" · ainda sem acerto pelo GPS")+(e.aviso?" · AVISO SONORO LIGADO (cada toque ganha uma batida curta no fim)":"");
+ var l=[];
+ l.push(e.sync>=0?"Hora conferida há "+e.sync+" min ("+e.fonte+")":"Hora ainda não conferida pela rede");
+ l.push("Rede: "+e.ntp);
+ if(e.gpsVisto)l.push("GPS: "+e.gps);
+ if(e.aviso)l.push("AVISO SONORO LIGADO: sem conferir a hora há mais de "+e.alertaMin+" min (cada toque ganha uma batida curta no fim)");
+ $("gps").textContent=l.join(" · ");
  $("proximo").textContent=e.proximo||"-";
  var t="Wi-Fi do sino: "+e.ap+" (oculto), "+e.apClientes+" aparelho(s) conectado(s), página em http://192.168.4.1. ";
  t+=e.inst?("Rede da instituição \""+e.inst+"\": "+e.instEstado+(e.instIp?", página também em http://"+e.instIp+" ou http://"+e.nome+".local":"")):"Rede da instituição: não configurada.";
  $("redeInfo").textContent=t;
  if(document.activeElement!==$("instNome")&&!$("instNome").dataset.ok){$("instNome").value=e.inst;$("instNome").dataset.ok=1}
+ if(document.activeElement!==$("ntpServ")&&!$("ntpServ").dataset.ok){$("ntpServ").value=e.ntpServ;$("ntpServ").dataset.ok=1}
 }).catch(function(){var s=$("selo");s.textContent="sem conexão com o sino";s.className="selo semhora"})}
 $("btAdd").onclick=function(){lista.push({h:-1,m:0,dias:62,ms:3000,vezes:1});mudou();desenhar()};
 $("btSalvar").onclick=function(){var e=validar();if(e){msg("msgSalvar",e,true);return}ordenar();
@@ -149,7 +156,7 @@ $("btRede").onclick=function(){var ap=$("apSenha").value,ad=$("adminSenha").valu
  if(ap&&ap.length<8){msg("msgRede","A senha do Wi-Fi precisa de pelo menos 8 caracteres",true);return}
  if(ad&&ad.length<6){msg("msgRede","A senha da página precisa de pelo menos 6 caracteres",true);return}
  if(!confirm("Salvar e reiniciar o sino? Ele volta em uns 10 segundos."))return;
- post("/api/rede",{instNome:$("instNome").value,instSenha:$("instSenha").value,apSenha:ap,adminSenha:ad}).then(function(t){msg("msgRede",t)}).catch(function(x){msg("msgRede",x.message,true)})};
+ post("/api/rede",{instNome:$("instNome").value,instSenha:$("instSenha").value,ntpServidor:$("ntpServ").value,apSenha:ap,adminSenha:ad}).then(function(t){msg("msgRede",t)}).catch(function(x){msg("msgRede",x.message,true)})};
 window.onbeforeunload=function(){if(alterado)return"Há horários não salvos."};
 carregarHorarios().catch(function(){msg("msgSalvar","não consegui ler os horários",true)});
 estado();setInterval(estado,5000);setInterval(tique,250);

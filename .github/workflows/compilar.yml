@@ -25,6 +25,8 @@ jobs:
         run: cd sino-gps/testes && g++ -std=c++17 -Wall -Wextra -I../sino_gps teste_logica.cpp -o teste && ./teste
       - name: Sino GPS (pagina)
         run: cd sino-gps/testes && g++ -std=c++17 -Wall -Wextra -I../sino_gps teste_web.cpp -o teste_web && ./teste_web
+      - name: Sino GPS (hora pela rede)
+        run: cd sino-gps/testes && g++ -std=c++17 -Wall -Wextra -I../sino_gps teste_ntp.cpp -o teste_ntp && ./teste_ntp
       - name: Teste de rede
         run: cd teste-rede-esp32/testes && g++ -std=c++17 -Wall -Wextra -I../teste_rede teste_analise.cpp -o teste && ./teste
 

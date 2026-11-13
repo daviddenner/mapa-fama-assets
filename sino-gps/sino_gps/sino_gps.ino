@@ -2,10 +2,11 @@
 //  Sino escolar sincronizado por GPS
 //  ESP-12 (ESP8266) + GPS NEO-6M/NEO-M8N + RTC DS3231 + relé (sino 127 V)
 //
-//  O sino não depende de roteador nem de internet para tocar na hora certa:
-//  - O GPS dá a hora exata (a mesma para todos os sinos, com erro de milissegundos).
+//  O sino toca na hora certa mesmo quando a rede cai:
+//  - Pela rede da instituição, a hora é conferida num servidor NTP (ntp.ino).
+//    Opcional: um GPS também pode dar a hora exata, sem rede nenhuma.
 //  - O DS3231 guarda a hora (com bateria) e mantém o sino funcionando quando
-//    o GPS fica sem sinal ou depois de uma queda de energia.
+//    a rede (ou o GPS) fica fora ou depois de uma queda de energia.
 //  - Os horários são mudados por uma página no próprio sino (web.ino), aberta
 //    pela rede Wi-Fi do sino (nome oculto) ou pela rede da instituição.
 //    Ficam guardados na memória; horarios.h é só a tabela inicial.
@@ -21,12 +22,16 @@
 #include <SoftwareSerial.h>
 #include <Wire.h>
 
+#include <WiFiUdp.h>
+#include <sntp.h>  // servidor de hora informado pelo DHCP
+
 #include "agenda.h"
 #include "armazenamento.h"
 #include "config.h"
 #include "ds3231.h"
 #include "horarios.h"
 #include "nmea.h"
+#include "ntp.h"
 #include "pagina.h"
 #include "tempo.h"
 #include "web_util.h"
@@ -57,16 +62,25 @@ uint32_t contagemSentencas = 0;
 uint32_t segundosComFix = 0;  // total desde que ligou
 bool mostrarNmea = false;
 
+// De onde veio a hora gravada (ou conferida) no DS3231
+const uint8_t FONTE_MANUAL = 0, FONTE_GPS = 1, FONTE_NTP = 2;
+static const char *const NOME_FONTE[] = {"hora do aparelho", "GPS", "rede (NTP)"};
+
 bool syncPendente = false;
 bool syncEstavel = false;
-bool syncDoGps = true;  // false = acerto pela hora do celular (página)
+uint8_t syncFonte = FONTE_GPS;
 int filaNoDolar = 0;    // caracteres já na fila quando chegou o '$' da sentença
 uint32_t syncAlvoEpoch = 0;
 uint32_t syncAlvoMs = 0;
 bool jaSincronizouEstavel = false;
-bool horaManual = false;  // acertada pelo comando "hora": o GPS corrige assim que puder
+bool horaManual = false;  // acertada à mão: a rede/GPS corrige assim que puder
 bool algumSyncGps = false;
-uint32_t ultimoSyncMs = 0;
+uint32_t ultimoSyncMs = 0;  // último acerto pelo GPS (o GPS acerta de hora em hora)
+
+// Última vez que uma fonte externa (rede ou GPS) conferiu a hora do DS3231
+bool algumaConfirmacao = false;
+uint32_t ultimaConfirmacaoMs = 0;
+uint8_t ultimaFonte = FONTE_MANUAL;
 
 // ------------------------------------------------------------------- Toque
 struct {
@@ -136,11 +150,31 @@ void iniciarToque(uint32_t duracaoMs, uint8_t vezes, bool comAviso) {
   rele(true);
 }
 
-// O relógio está há tempo demais sem ser acertado? (conta desde que ligou, se
-// ainda não acertou nenhuma vez)
+// A rede (ou o GPS) acabou de conferir a hora do DS3231.
+void confirmarHora(uint8_t fonte) {
+  algumaConfirmacao = true;
+  ultimaConfirmacaoMs = millis();
+  ultimaFonte = fonte;
+}
+
+// Hora conferida há pouco tempo?
+bool horaConfirmadaRecente() {
+  return algumaConfirmacao && millis() - ultimaConfirmacaoMs <= ALERTA_SEM_ACERTO_MIN * 60000UL;
+}
+
+// O relógio está há tempo demais sem ser conferido? (conta desde que ligou, se
+// ainda não foi conferido nenhuma vez)
 bool semAcertoHaMuitoTempo() {
-  const uint32_t desde = algumSyncGps ? ultimoSyncMs : 0;
-  return millis() - desde > ALERTA_SEM_GPS_H * 3600000UL;
+  const uint32_t desde = algumaConfirmacao ? ultimaConfirmacaoMs : 0;
+  return millis() - desde > ALERTA_SEM_ACERTO_MIN * 60000UL;
+}
+
+// Um horário da tabela vai tocar nos próximos 'seg' segundos?
+bool toqueEmBreve(uint32_t seg) {
+  if (!horaValida) return false;
+  const uint32_t local = paraLocal(epochUtc);
+  const uint32_t p = proximoToque(cfg.horarios, cfg.nHorarios, local);
+  return p && p - local <= seg;
 }
 
 bool avisoSonoroAtivo() { return AVISO_SONORO && semAcertoHaMuitoTempo(); }
@@ -184,19 +218,19 @@ void imprimirStatus() {
   }
   Serial.print(F(" | RTC: "));
   Serial.print(rtcOk ? F("ok") : F("NAO RESPONDE"));
-  Serial.print(F(" | GPS: "));
-  if (millis() - ultimoDadoGpsMs > 3000) {
-    Serial.print(F("SEM DADOS (confira TX do GPS -> GPIO14)"));
-  } else if (gpsComSinal) {
-    Serial.printf("com sinal (%lu s no total)", (unsigned long)segundosComFix);
+  Serial.print(F(" | hora conferida: "));
+  if (algumaConfirmacao) {
+    Serial.printf("ha %lu min (%s)", (unsigned long)((millis() - ultimaConfirmacaoMs) / 60000UL),
+                  NOME_FONTE[ultimaFonte]);
   } else {
-    Serial.print(F("procurando satelites"));
+    Serial.print(F("nenhuma vez desde que ligou"));
   }
-  Serial.print(F(" | ultimo acerto GPS: "));
-  if (algumSyncGps) {
-    Serial.printf("ha %lu min", (unsigned long)((millis() - ultimoSyncMs) / 60000UL));
-  } else {
-    Serial.print(F("nenhum desde que ligou"));
+  char ntp[96];
+  textoNtp(ntp, sizeof ntp);
+  Serial.printf(" | rede: %s", ntp);
+  if (gpsVisto()) {
+    Serial.print(F(" | GPS: "));
+    Serial.print(gpsComSinal ? F("com sinal") : F("sem sinal"));
   }
   if (avisoSonoroAtivo()) Serial.print(F(" | AVISO SONORO LIGADO"));
   if (horaValida) {
@@ -222,7 +256,8 @@ void listarHorarios() {
 
 void ajuda() {
   Serial.println(F("Comandos (digite e tecle Enter, 115200 baud):"));
-  Serial.println(F("  status                       mostra hora, GPS e proximo toque"));
+  Serial.println(F("  status                       mostra hora, rede, GPS e proximo toque"));
+  Serial.println(F("  ntp                          confere a hora pela rede agora"));
   Serial.println(F("  horarios                     lista a tabela de horarios"));
   Serial.println(F("  toque                        toque de teste"));
   Serial.println(F("  gps                          liga/desliga a exibicao do NMEA cru"));
@@ -302,9 +337,11 @@ void processarRmc(const LeituraRMC &rmc, uint32_t inicioMs) {
     Serial.println(F("GPS: sinal OK"));
   }
 
+  const bool estavel = segundosComFix >= GPS_ESTAVEL_MIN * 60UL;
+  if (estavel && jaSincronizouEstavel) confirmarHora(FONTE_GPS);
+
   if (filaNoDolar > 40) return;  // o laço atrasou demais: a hora de chegada não é confiável
 
-  const bool estavel = segundosComFix >= GPS_ESTAVEL_MIN * 60UL;
   const bool precisa =
       !horaValida || horaManual ||
       (estavel && (!jaSincronizouEstavel || millis() - ultimoSyncMs >= INTERVALO_SYNC_MIN * 60000UL));
@@ -316,16 +353,21 @@ void processarRmc(const LeituraRMC &rmc, uint32_t inicioMs) {
   syncAlvoEpoch = utc + 1 + desde / 1000;
   syncAlvoMs = inicioMs + (1000 - desde % 1000);
   syncEstavel = estavel;
-  syncDoGps = true;
+  syncFonte = FONTE_GPS;
   syncPendente = true;
 }
+
+bool gpsVisto() { return contagemSentencas > 0; }
 
 void executarSyncPendente() {
   if (!syncPendente) return;
   const int32_t atraso = (int32_t)(millis() - syncAlvoMs);
   if (atraso < 0) return;
   syncPendente = false;
-  if (atraso > 20) return;  // perdeu o momento certo; tenta no próximo segundo
+  if (atraso > 20) {  // perdeu o momento certo: tenta de novo
+    if (syncFonte == FONTE_NTP) ntpRepetirLogo();
+    return;
+  }
 
   const bool eraConfiavel = horaValida && !horaManual;
   const int32_t diferenca = (int32_t)(syncAlvoEpoch - epochUtc);  // 0 ou 1 = RTC já estava certo
@@ -339,15 +381,22 @@ void executarSyncPendente() {
   }
   horaValida = true;
   proximaLeituraRtcMs = millis();  // lê o RTC de novo já
-  if (!syncDoGps) {  // acerto pela hora do aparelho (página)
+  if (syncFonte == FONTE_MANUAL) {  // acerto pela hora do aparelho (página)
     horaManual = true;
     ultimoMinutoTocado = paraLocal(syncAlvoEpoch) / 60;  // não toca no minuto do acerto
     Serial.print(F("RTC acertado pela hora do aparelho: "));
     imprimirDataHora(paraLocal(syncAlvoEpoch));
     Serial.println();
+    ntpRepetirLogo();  // a rede confere em seguida
     return;
   }
   horaManual = false;
+  if (syncFonte == FONTE_NTP) {
+    Serial.print(F("RTC acertado pela rede (NTP): "));
+    imprimirDataHora(paraLocal(syncAlvoEpoch));
+    Serial.println(eraConfiavel ? "" : " (primeiro acerto)");
+    return;
+  }
   algumSyncGps = true;
   ultimoSyncMs = millis();
   if (syncEstavel) jaSincronizouEstavel = true;
@@ -391,8 +440,8 @@ void lerGps() {
 
 // ============================================================ LED e botão
 // LED do ESP-12, piscando junto com a virada do segundo:
-//   1 piscada por segundo ...... tudo certo (acertado pelo GPS recentemente)
-//   2 piscadas por segundo ..... funcionando só pelo RTC (veja a antena do GPS)
+//   1 piscada por segundo ...... tudo certo (hora conferida pela rede há pouco)
+//   2 piscadas por segundo ..... funcionando só pelo DS3231 (rede fora?)
 //   piscando rápido ............ SEM HORA: não vai tocar
 //   aceso direto ............... tocando
 void atualizarLed() {
@@ -403,7 +452,7 @@ void atualizarLed() {
     aceso = true;
   } else if (!rtcOk || !horaValida) {
     aceso = (agora / 100) % 2;
-  } else if (!algumSyncGps || agora - ultimoSyncMs > ALERTA_SEM_GPS_H * 3600000UL) {
+  } else if (!horaConfirmadaRecente()) {
     aceso = fase < 60 || (fase >= 200 && fase < 260);
   } else {
     aceso = fase < 60;
@@ -469,6 +518,9 @@ void executarComando(const char *cmd) {
     acertarNaMao(cmd + 5);
   } else if (!strcmp(cmd, "wifi")) {
     imprimirRede();
+  } else if (!strcmp(cmd, "ntp")) {
+    Serial.println(F("Conferindo a hora pela rede..."));
+    ntpConferirEMostrar();
   } else if (!strcmp(cmd, "senhas-padrao")) {
     copiarTexto(cfg.apSenha, sizeof cfg.apSenha, AP_SENHA_PADRAO);
     copiarTexto(cfg.adminSenha, sizeof cfg.adminSenha, ADMIN_SENHA_PADRAO);
@@ -535,6 +587,7 @@ void loop() {
   atualizarLed();
   lerSerial();
   atualizarWeb();
+  atualizarNtp();
 
   static uint32_t ultimoAvisoMs = 0;  // sem hora: mostra o estado a cada 10 s
   if (!horaValida && millis() - ultimoAvisoMs >= 10000) {
