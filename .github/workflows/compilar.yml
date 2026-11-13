@@ -51,8 +51,10 @@ jobs:
         run: |
           arduino-cli core update-index --additional-urls "$URL_ESP8266"
           arduino-cli core install esp8266:esp8266 --additional-urls "$URL_ESP8266"
-      - name: Compilar
+      - name: Compilar (Generic ESP8266 Module)
         run: arduino-cli compile --fqbn esp8266:esp8266:generic --warnings default sino-gps/sino_gps
+      - name: Compilar (NodeMCU 1.0, a placa indicada no README)
+        run: arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 --warnings default sino-gps/sino_gps
 
   teste-rede-esp32:
     name: Teste de rede (ESP32 ${{ matrix.versao }})

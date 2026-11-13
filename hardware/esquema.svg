@@ -5,7 +5,7 @@
 <line x1="1676.4" y1="0.0" x2="0.0" y2="0.0" stroke="#8a1c1c" stroke-width="2.44" stroke-linecap="round"/>
 <line x1="0.0" y1="0.0" x2="0.0" y2="1143.0" stroke="#8a1c1c" stroke-width="2.44" stroke-linecap="round"/>
 <text x="76.2" y="76.2" font-size="12.5" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto" font-weight="bold">ALIMENTACAO 5V</text>
-<text x="442.0" y="304.8" font-size="12.5" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto" font-weight="bold">NODEMCU (ESP-12E)</text>
+<text x="442.0" y="304.8" font-size="12.5" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto" font-weight="bold">NODEMCU V3 (LOLIN)</text>
 <text x="1097.3" y="91.4" font-size="12.5" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto" font-weight="bold">RELOGIO DS3231 - LADO DE 4 PINOS</text>
 <text x="1097.3" y="259.1" font-size="12.5" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto" font-weight="bold">GPS (OPCIONAL)</text>
 <text x="1280.2" y="289.6" font-size="12.5" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto" font-weight="bold">ACIONAMENTO DO RELE</text>
@@ -13,12 +13,12 @@
 <text x="1005.8" y="716.3" font-size="12.5" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto" font-weight="bold">SAIDA 127V PARA O SINO</text>
 <text x="45.7" y="708.7" font-size="12.5" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto" font-weight="bold">NOTAS</text>
 <text x="45.7" y="731.5" font-size="10.1" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto">1. Fonte 5V (ex.: HLK-PM01) em J1: alimenta o rele e o NodeMCU pelo pino VIN.</text>
-<text x="45.7" y="754.4" font-size="10.1" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto">2. O 3V3 do NodeMCU alimenta o RTC. Use bateria CR2032 no modulo.</text>
+<text x="45.7" y="754.4" font-size="10.1" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto">2. O 3V do NodeMCU alimenta o RTC (bateria CR2032). VU = 5V do USB: nao ligar.</text>
 <text x="45.7" y="777.2" font-size="10.1" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto">3. Q1 liga o rele com D6/GPIO12 em nivel ALTO: no firmware, RELE_ATIVO_EM_BAIXO = false.</text>
 <text x="45.7" y="800.1" font-size="10.1" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto">4. R2 mantem o rele desligado enquanto o ESP liga ou e gravado.</text>
 <text x="45.7" y="823.0" font-size="10.1" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto">5. D1 = diodo de roda livre (catodo no +5V). Rele com mais de 90 mA: troque Q1 por BC337.</text>
-<text x="45.7" y="845.8" font-size="10.1" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto">6. RTC: lado de 4 pinos do ZS-042 (SCL, SDA, VCC, GND). Confira a ordem impressa no modulo.</text>
-<text x="45.7" y="868.7" font-size="10.1" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto">7. Gravar o firmware: USB do NodeMCU. Mudar horarios: Wi-Fi do sino, http://192.168.4.1</text>
+<text x="45.7" y="845.8" font-size="10.1" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto">6. RTC: lado de 4 pinos do ZS-042, na ordem impressa no modulo: SCL, SDA, VCC, GND.</text>
+<text x="45.7" y="868.7" font-size="10.1" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto">7. Hora certa pela rede (NTP); o DS3231 segura a hora quando a rede cai. J3 (GPS) e opcional.</text>
 <text x="45.7" y="891.5" font-size="10.1" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto">8. 127V: fase -&gt; J2.1 -&gt; F1 -&gt; COM; NA -&gt; J2.2 -&gt; sino; neutro direto no sino.</text>
 <text x="45.7" y="914.4" font-size="10.1" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto">9. Snubber R4+C3 opcional (protege o contato e evita reset do ESP).</text>
 <text x="45.7" y="937.3" font-size="10.1" fill="#1f3f8f" text-anchor="start" dominant-baseline="auto">10. Na placa: deixar 6 mm ou mais entre a parte de 127V e o resto do circuito.</text>
@@ -26,7 +26,7 @@
 <line x1="1097.3" y1="1143.0" x2="1097.3" y2="1005.8" stroke="#8a1c1c" stroke-width="1.52" stroke-linecap="round"/>
 <line x1="1097.3" y1="1066.8" x2="1676.4" y2="1066.8" stroke="#8a1c1c" stroke-width="1.52" stroke-linecap="round"/>
 <text x="1112.5" y="1043.9" font-size="14.5" fill="#8a1c1c" text-anchor="start" dominant-baseline="auto" font-weight="bold">SINO IFMS - CONTROLADOR DO SINO</text>
-<text x="1112.5" y="1104.9" font-size="10.1" fill="#8a1c1c" text-anchor="start" dominant-baseline="auto">NodeMCU + DS3231 + rele 5V   Rev. 2   2026-11-13</text>
+<text x="1112.5" y="1104.9" font-size="10.1" fill="#8a1c1c" text-anchor="start" dominant-baseline="auto">NodeMCU v3 + DS3231 + rele 5V   Rev. 3   2026-11-13</text>
 <text x="1112.5" y="1127.8" font-size="10.1" fill="#8a1c1c" text-anchor="start" dominant-baseline="auto">Firmware: sino-gps/sino_gps</text>
 <line x1="137.2" y1="160.0" x2="167.6" y2="160.0" stroke="#8a1c1c" stroke-width="1.52" stroke-linecap="round"/>
 <line x1="167.6" y1="160.0" x2="167.6" y2="190.5" stroke="#8a1c1c" stroke-width="1.52" stroke-linecap="round"/>
@@ -64,35 +64,35 @@
 <line x1="716.3" y1="579.1" x2="533.4" y2="579.1" stroke="#8a1c1c" stroke-width="2.44" stroke-linecap="round"/>
 <line x1="533.4" y1="579.1" x2="533.4" y2="335.3" stroke="#8a1c1c" stroke-width="2.44" stroke-linecap="round"/>
 <text x="624.8" y="327.7" font-size="10.1" fill="#444" text-anchor="middle" dominant-baseline="auto">U1</text>
-<text x="624.8" y="586.7" font-size="10.1" fill="#444" text-anchor="middle" dominant-baseline="hanging">NodeMCU ESP-12E</text>
+<text x="624.8" y="586.7" font-size="10.1" fill="#444" text-anchor="middle" dominant-baseline="hanging">NodeMCU v3 LoLin</text>
 <line x1="502.9" y1="350.5" x2="533.4" y2="350.5" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
 <text x="538.0" y="350.5" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">A0</text>
 <line x1="502.9" y1="365.8" x2="533.4" y2="365.8" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="538.0" y="365.8" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">RSV</text>
+<text x="538.0" y="365.8" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">G</text>
 <line x1="502.9" y1="381.0" x2="533.4" y2="381.0" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="538.0" y="381.0" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">RSV</text>
+<text x="538.0" y="381.0" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">VU</text>
 <line x1="502.9" y1="396.2" x2="533.4" y2="396.2" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="538.0" y="396.2" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">SD3</text>
+<text x="538.0" y="396.2" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">S3</text>
 <line x1="502.9" y1="411.5" x2="533.4" y2="411.5" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="538.0" y="411.5" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">SD2</text>
+<text x="538.0" y="411.5" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">S2</text>
 <line x1="502.9" y1="426.7" x2="533.4" y2="426.7" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="538.0" y="426.7" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">SD1</text>
+<text x="538.0" y="426.7" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">S1</text>
 <line x1="502.9" y1="442.0" x2="533.4" y2="442.0" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="538.0" y="442.0" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">CMD</text>
+<text x="538.0" y="442.0" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">SC</text>
 <line x1="502.9" y1="457.2" x2="533.4" y2="457.2" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="538.0" y="457.2" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">SD0</text>
+<text x="538.0" y="457.2" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">S0</text>
 <line x1="502.9" y1="472.4" x2="533.4" y2="472.4" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="538.0" y="472.4" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">CLK</text>
+<text x="538.0" y="472.4" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">SK</text>
 <line x1="502.9" y1="487.7" x2="533.4" y2="487.7" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="538.0" y="487.7" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">GND</text>
+<text x="538.0" y="487.7" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">G</text>
 <line x1="502.9" y1="502.9" x2="533.4" y2="502.9" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="538.0" y="502.9" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">3V3</text>
+<text x="538.0" y="502.9" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">3V</text>
 <line x1="502.9" y1="518.2" x2="533.4" y2="518.2" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
 <text x="538.0" y="518.2" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">EN</text>
 <line x1="502.9" y1="533.4" x2="533.4" y2="533.4" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
 <text x="538.0" y="533.4" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">RST</text>
 <line x1="502.9" y1="548.6" x2="533.4" y2="548.6" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="538.0" y="548.6" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">GND</text>
+<text x="538.0" y="548.6" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">G</text>
 <line x1="502.9" y1="563.9" x2="533.4" y2="563.9" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
 <text x="538.0" y="563.9" font-size="8.7" fill="#8a1c1c" text-anchor="start" dominant-baseline="middle">VIN</text>
 <line x1="746.8" y1="350.5" x2="716.3" y2="350.5" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
@@ -106,9 +106,9 @@
 <line x1="746.8" y1="411.5" x2="716.3" y2="411.5" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
 <text x="711.7" y="411.5" font-size="8.7" fill="#8a1c1c" text-anchor="end" dominant-baseline="middle">D4/GPIO2</text>
 <line x1="746.8" y1="426.7" x2="716.3" y2="426.7" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="711.7" y="426.7" font-size="8.7" fill="#8a1c1c" text-anchor="end" dominant-baseline="middle">3V3</text>
+<text x="711.7" y="426.7" font-size="8.7" fill="#8a1c1c" text-anchor="end" dominant-baseline="middle">3V</text>
 <line x1="746.8" y1="442.0" x2="716.3" y2="442.0" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="711.7" y="442.0" font-size="8.7" fill="#8a1c1c" text-anchor="end" dominant-baseline="middle">GND</text>
+<text x="711.7" y="442.0" font-size="8.7" fill="#8a1c1c" text-anchor="end" dominant-baseline="middle">G</text>
 <line x1="746.8" y1="457.2" x2="716.3" y2="457.2" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
 <text x="711.7" y="457.2" font-size="8.7" fill="#8a1c1c" text-anchor="end" dominant-baseline="middle">D5/GPIO14</text>
 <line x1="746.8" y1="472.4" x2="716.3" y2="472.4" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
@@ -122,9 +122,9 @@
 <line x1="746.8" y1="533.4" x2="716.3" y2="533.4" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
 <text x="711.7" y="533.4" font-size="8.7" fill="#8a1c1c" text-anchor="end" dominant-baseline="middle">TX</text>
 <line x1="746.8" y1="548.6" x2="716.3" y2="548.6" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="711.7" y="548.6" font-size="8.7" fill="#8a1c1c" text-anchor="end" dominant-baseline="middle">GND</text>
+<text x="711.7" y="548.6" font-size="8.7" fill="#8a1c1c" text-anchor="end" dominant-baseline="middle">G</text>
 <line x1="746.8" y1="563.9" x2="716.3" y2="563.9" stroke="#8a1c1c" stroke-width="1.00" stroke-linecap="round"/>
-<text x="711.7" y="563.9" font-size="8.7" fill="#8a1c1c" text-anchor="end" dominant-baseline="middle">3V3</text>
+<text x="711.7" y="563.9" font-size="8.7" fill="#8a1c1c" text-anchor="end" dominant-baseline="middle">3V</text>
 <line x1="1143.0" y1="129.5" x2="1249.7" y2="129.5" stroke="#8a1c1c" stroke-width="2.44" stroke-linecap="round"/>
 <line x1="1249.7" y1="129.5" x2="1249.7" y2="205.7" stroke="#8a1c1c" stroke-width="2.44" stroke-linecap="round"/>
 <line x1="1249.7" y1="205.7" x2="1143.0" y2="205.7" stroke="#8a1c1c" stroke-width="2.44" stroke-linecap="round"/>

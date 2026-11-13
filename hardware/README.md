@@ -7,6 +7,7 @@
 | `Sino_IFMS_v2.sch` | esquema para o **Eagle** (7.7 ou mais novo). A biblioteca das peças vai junto, dentro do arquivo |
 | `esquema.png` / `esquema.svg` | prévia do mesmo esquema |
 | `gerar_esquema.py` | script que gera os três arquivos acima (`python3 gerar_esquema.py`) |
+| [`PROTOBOARD.md`](PROTOBOARD.md) | **montagem e roteiro de teste na protoboard** (faça antes da placa) |
 
 Para abrir: copie `Sino_IFMS_v2.sch` para a pasta do projeto no Eagle
 (`Documentos\EAGLE\Sino_IFMS`) e abra pelo Eagle. O nome tem `_v2` de propósito,
@@ -18,8 +19,8 @@ para não sobrescrever o esquema que já existe lá. Para desenhar a placa, use
 | Bloco | Como funciona |
 |---|---|
 | **Alimentação** | Uma fonte de 5 V (ex.: HLK-PM01) entra por **J1**. C1 (470 µF) e C2 (100 nF) seguram os picos do Wi-Fi e do relé. Os 5 V alimentam o **relé** e o **NodeMCU pelo pino VIN** |
-| **NodeMCU (U1)** | ESP-12E com USB e regulador de 3,3 V. O **3V3 do NodeMCU alimenta o relógio** |
-| **Relógio (U2)** | Módulo DS3231 ZS-042 ligado pelo **lado de 4 pinos** (SCL, SDA, VCC, GND), com bateria CR2032 |
+| **NodeMCU v3 LoLin (U1)** | ESP-12E com USB e regulador de 3,3 V. Pega a hora pela rede (NTP). O **3V do NodeMCU alimenta o relógio**. O pino VU (5 V do USB) fica sem ligar |
+| **Relógio (U2)** | Módulo DS3231 ZS-042 ligado pelo **lado de 4 pinos** (SCL, SDA, VCC, GND, conferido na foto do módulo), com bateria CR2032. Segura a hora quando a rede cai |
 | **Relé (K1)** | Relé 5 V acionado por **Q1 (BC548)**. R1 (1 kΩ) na base, **R2 (10 kΩ)** segura o relé desligado enquanto o ESP liga ou é gravado, **D1 (1N4007) é o diodo de roda livre**. LED1 + R3 acendem quando o relé liga |
 | **Saída 127 V** | Fase entra em **J2.1**, passa pelo **fusível F1** e vai ao **COM** do relé; o **NA** volta por **J2.2** para o sino. O neutro vai direto ao sino. R4 + C3 (snubber, opcional) protegem o contato |
 | **Botão S1** | Toque de teste na mão |
@@ -36,7 +37,8 @@ para não sobrescrever o esquema que já existe lá. Para desenhar a placa, use
 | D6 | 12 | R1 → base do BC548 (relé) | `PINO_RELE` |
 | D7 | 13 | botão de teste S1 (até o GND) | `PINO_BOTAO_TESTE` |
 | VIN | – | +5 V da fonte | – |
-| 3V3 | – | VCC do DS3231 | – |
+| 3V | – | VCC do DS3231 | – |
+| G | – | GND | – |
 
 > **Importante no firmware:** com o BC548 o relé liga quando D6 vai a 3,3 V,
 > então `RELE_ATIVO_EM_BAIXO` tem que ser **`false`** (já está assim no
@@ -45,8 +47,9 @@ para não sobrescrever o esquema que já existe lá. Para desenhar a placa, use
 ## Gerenciamento local
 
 - **Gravar o firmware:** pelo USB do NodeMCU (os botões RST e FLASH já estão
-  na placa do NodeMCU). Para gravar, prefira desligar a fonte de 5 V. Muitos
-  NodeMCU têm um diodo entre o USB e o VIN, mas nem todo clone tem.
+  na placa do NodeMCU). Na Arduino IDE, placa **NodeMCU 1.0 (ESP-12E Module)**.
+  Para gravar, prefira desligar a fonte de 5 V. Muitos NodeMCU têm um diodo
+  entre o USB e o VIN, mas nem todo clone tem.
 - **Mudar horários e senhas sem internet:** pela rede Wi-Fi do próprio sino
   (nome oculto), em `http://192.168.4.1`. Veja `../sino-gps/README.md`.
 - **Pela rede da instituição:** quando o MAC estiver cadastrado, a mesma página
@@ -56,7 +59,7 @@ para não sobrescrever o esquema que já existe lá. Para desenhar a placa, use
 
 | Ref. | Peça | Qtd. |
 |---|---|---|
-| U1 | NodeMCU ESP-12E (v2 "Amica"; o v3 "LoLin" é mais largo, ver notas) | 1 |
+| U1 | NodeMCU v3 LoLin (ESP-12E) | 1 |
 | U2 | Módulo RTC DS3231 ZS-042 + bateria CR2032 | 1 |
 | K1 | Relé 5 V SRD-05VDC-SL-C (Songle) | 1 |
 | Q1 | Transistor BC548 (ou BC337, mesma pinagem) | 1 |
@@ -76,11 +79,11 @@ para não sobrescrever o esquema que já existe lá. Para desenhar a placa, use
 
 ## Notas para quando for fazer a placa
 
-- **RTC:** a ordem dos 4 pinos do ZS-042 no esquema é SCL, SDA, VCC, GND.
-  **Confira a ordem impressa no seu módulo** antes de fazer a placa.
-- **NodeMCU:** o desenho da placa usa o v2 (fileiras a 22,86 mm). Se o seu for
-  o v3 LoLin (fileiras a 27,94 mm), avise que eu ajusto, ou use barras fêmea
-  separadas.
+- **RTC:** a ordem dos 4 pinos do ZS-042 (SCL, SDA, VCC, GND) foi conferida
+  na foto do módulo.
+- **NodeMCU:** o desenho usa o v3 LoLin (fileiras a 27,94 mm, placa de
+  31 x 58 mm). O contorno é aproximado: confira com a placa antes de furar.
+  Barras fêmea de 15 pinos deixam o NodeMCU removível.
 - **Relé:** o desenho usa as medidas do SRD (pinos 1 = COM, 3 = NA, 4 = NF,
   2 e 5 = bobina). A corrente da bobina é de uns 70 mA, dentro do BC548 (máx.
   100 mA). Com relé de bobina mais forte, use **BC337**.

@@ -1,63 +1,53 @@
-# Sino GPS: sinos sincronizados sem depender da rede
+# Sino IFMS: sino na hora certa pela rede, com relógio de reserva
 
-Cada sino acerta o próprio relógio pelo **GPS**. Para tocar na hora certa ele
-não precisa de roteador, internet nem cadastro de endereço MAC, então nada que
-a TI mude na rede faz o sino parar.
+> A pasta se chama `sino-gps` porque o projeto começou com GPS. Hoje a fonte
+> principal da hora é a **rede**; o GPS ficou como opção.
+
+O sino confere a hora pela **rede da instituição** (servidor de hora NTP) e a
+guarda num **DS3231**, um relógio de precisão com bateria. Quando a rede cai,
+o DS3231 segura a hora e o sino continua tocando certo. Quando ela volta, a
+hora é conferida de novo.
 
 Os horários são mudados por uma **página no próprio sino**, aberta pelo Wi-Fi
-do sino (nome oculto, com senha) ou, quando o MAC estiver cadastrado, também
-pela rede da instituição.
-
-Todos os receptores GPS recebem a hora dos mesmos relógios atômicos dos
-satélites. Por isso sinos em prédios diferentes, sem nenhuma ligação entre
-eles, tocam juntos, com diferença de poucos milissegundos.
+do sino (nome oculto, com senha) mesmo sem internet ou, com a rede conectada,
+também pela rede da instituição.
 
 ```
-  satélites GPS
-       │  (hora UTC exata)
-       ▼
- ┌───────────┐  TX→GPIO14  ┌─────────┐ GPIO12 ┌──────┐   127 V  ┌──────┐
- │ GPS NEO-6M│────────────▶│ ESP-12  │───────▶│ relé │─────────▶│ sino │
- └───────────┘             └─────────┘        └──────┘          └──────┘
-                             ▲     │ I2C (GPIO4/GPIO5)
-                             │     ▼
-                           ┌─────────────────────────┐
-                           │ RTC DS3231 + bateria    │  ← o relógio que comanda o sino
-                           └─────────────────────────┘
+  servidor de hora (NTP)        rede Wi-Fi da instituição
+            │                              │
+            ▼                              ▼
+ ┌───────────────────────┐ D6/GPIO12 ┌──────┐   127 V  ┌──────┐
+ │ NodeMCU v3 (ESP-12E)  │──────────▶│ relé │─────────▶│ sino │
+ │ Wi-Fi próprio oculto  │   BC548   └──────┘          └──────┘
+ └───────────────────────┘
+        ▲     │ I2C (D1/D2)
+        │     ▼
+  ┌─────────────────────────┐
+  │ RTC DS3231 + bateria    │  ← o relógio que comanda o sino
+  └─────────────────────────┘
 ```
 
-- Quem comanda o sino é o **DS3231** (relógio de precisão com bateria). O GPS
-  só corrige esse relógio, uma vez por hora.
-- **Sem sinal de GPS**, o DS3231 segura a hora (erro típico de poucos segundos
-  por mês). Quando o sinal volta, ele é corrigido de novo.
+- Quem comanda o sino é o **DS3231**. A rede só confere esse relógio, a cada
+  10 minutos, e corrige se ele estiver mais de 20 ms fora.
+- **Rede fora:** o DS3231 segura a hora (erro de poucos segundos por mês).
+  Depois de 30 minutos sem conferir, o LED e o **aviso sonoro** avisam.
 - **Queda de energia:** o DS3231 tem bateria, então o sino volta tocando na
-  hora certa mesmo antes de o GPS pegar sinal.
-- **Aviso sonoro:** se o relógio ficar muito tempo sem ser acertado, cada toque
-  ganha uma batida curta no fim (veja abaixo). Quem ouvir sabe que é preciso
-  olhar o sino.
-- O Wi-Fi do sino serve só para a página: o sino toca do mesmo jeito sem ele.
-
-## Por que GPS e não GPRS
-
-| | GPS | GPRS (SIM800L) |
-|---|---|---|
-| Custo mensal | nenhum | um chip com plano em cada sino |
-| Depende de terceiros | não | da operadora (troca o problema da TI pelo da operadora) |
-| Precisão da hora | microssegundos | segundos (e nem toda operadora envia hora pela rede) |
-| Futuro | GPS não tem previsão de desligar | a rede 2G está sendo desativada aos poucos |
-| Alimentação | ~45 mA | picos de 2 A, e o módulo reinicia se a fonte não aguentar |
-| Ponto fraco | a antena precisa "ver" o céu | sinal de celular dentro do prédio |
+  hora certa mesmo antes de a rede conectar.
+- **GPS (opcional):** um módulo GPS no D5 também acerta o relógio, sem rede
+  nenhuma (veja "GPS" mais abaixo).
 
 ## Material (por sino)
 
 | Item | Observação |
 |---|---|
-| NodeMCU (ESP-12E), relé 5 V com BC548 e fonte 5 V | esquema completo em [`../hardware`](../hardware) |
-| Módulo GPS **GY-NEO6MV2** (NEO-6M) ou NEO-M8N | **use o mesmo modelo em todos os sinos** |
-| Módulo RTC **DS3231** (ZS-042) + bateria CR2032 | |
+| NodeMCU v3 (LoLin), relé 5 V com BC548 e fonte 5 V | esquema completo em [`../hardware`](../hardware) |
+| Módulo RTC **DS3231** (ZS-042) + bateria CR2032 | lado de 4 pinos: SCL, SDA, VCC, GND |
 | Botão (opcional) | toque de teste na mão |
-| Antena GPS ativa com cabo SMA de 3 a 5 m (opcional) | só onde o módulo não pega sinal (precisa de módulo GPS com conector) |
 | Snubber RC (100 Ω + 100 nF X2 275 VAC) | em paralelo com o sino (veja Segurança) |
+| Módulo GPS GY-NEO6MV2 (opcional) | só se quiser a hora também sem rede |
+
+Para testar na protoboard antes de fazer a placa, siga o
+[`../hardware/PROTOBOARD.md`](../hardware/PROTOBOARD.md).
 
 ## Ligações
 
@@ -66,17 +56,17 @@ saída de 127 V) está em [`../hardware`](../hardware). Resumo:
 
 | Módulo | Pino | Liga em |
 |---|---|---|
-| GPS | VCC | 3,3 V ou 5 V (o módulo tem regulador) |
-| GPS | GND | GND |
-| GPS (opcional) | TX | **GPIO14 (D5)** |
-| GPS | RX | não ligar |
-| DS3231 | VCC | **3,3 V** |
-| DS3231 | GND | GND |
+| DS3231 | VCC | **3V** (3,3 V do NodeMCU) |
+| DS3231 | GND | G (GND) |
 | DS3231 | SDA | **GPIO4 (D2)** |
 | DS3231 | SCL | **GPIO5 (D1)** |
 | Relé | via R1 1 kΩ + BC548 | **GPIO12 (D6)** |
 | Botão de teste | um lado | **GPIO13 (D7)** |
 | Botão de teste | outro lado | GND |
+| GPS (opcional) | VCC | 3,3 V ou 5 V (o módulo tem regulador) |
+| GPS (opcional) | GND | GND |
+| GPS (opcional) | TX | **GPIO14 (D5)** |
+| GPS (opcional) | RX | não ligar |
 
 Com o NodeMCU, os resistores de boot já estão na placa. Com um ESP-12 avulso:
 EN, RST, GPIO0 e GPIO2 em 3,3 V (10 kΩ) e GPIO15 em GND (10 kΩ). O LED azul do
@@ -109,10 +99,16 @@ próprio ESP-12 (GPIO2, D4) mostra o estado do sino.
    {11, 30, SEG_A_SEX, 2500, 1}, // fim do período, 2,5 s
    {8, 0, SAB, 1500, 1},         // só sábado
    ```
-4. Placa: **Generic ESP8266 Module** (ou NodeMCU / Wemos se for o caso). Grave.
-   Não precisa de nenhuma biblioteca além do pacote ESP8266.
+4. Placa: **NodeMCU 1.0 (ESP-12E Module)** (ou Generic ESP8266 Module com um
+   ESP-12 avulso). Grave. Não precisa de nenhuma biblioteca além do pacote ESP8266.
+5. Na página do sino, em "Rede e senhas", digite o nome e a senha da rede da
+   instituição. Se a TI indicar um servidor de hora interno, digite em
+   "Servidor de hora"; sem ele, o sino usa o informado pelo DHCP e o `a.ntp.br`.
 
-## Instalação do GPS
+## GPS (opcional)
+
+Só para quem quiser a hora também sem rede nenhuma. Ligue o TX do GPS no D5
+(conector J3 da placa). O sino usa o GPS e a rede ao mesmo tempo, se tiver os dois.
 
 - A antena (o quadrado de cerâmica) fica **virada para cima** e precisa "ver"
   o céu. Laje de concreto e telha metálica bloqueiam o sinal. Perto de uma
@@ -151,12 +147,12 @@ monitor serial ao ligar e no comando `wifi`.
 
 | Parte da página | Para que serve |
 |---|---|
-| Relógio e próximo toque | ver se o sino está certo; o selo verde "GPS ok" indica acerto recente |
+| Relógio e próximo toque | ver se o sino está certo; o selo verde "hora conferida" indica que a rede (ou o GPS) conferiu a hora nos últimos 30 min |
 | **Tocar agora (teste)** | faz o sino bater uma vez (pede confirmação) |
 | **Horários** | adicionar, mudar ou remover horários: hora, dias da semana, duração e número de batidas. **Clique em "Salvar horários"**: o sino passa a usar a tabela na hora e ela fica guardada mesmo sem energia |
 | Copiar a tabela para outro sino | copia a tabela como texto para colar na página de outro sino |
-| Acertar pela hora deste aparelho | só para quando o GPS ainda não pegou sinal; o GPS corrige depois |
-| Rede e senhas | rede da instituição, senha do Wi-Fi do sino e senha da página (o sino reinicia depois de salvar) |
+| Acertar pela hora deste aparelho | só para quando a rede ainda não conferiu a hora; a rede corrige depois |
+| Rede e senhas | rede da instituição, servidor de hora, senha do Wi-Fi do sino e senha da página (o sino reinicia depois de salvar) |
 
 **Troque as duas senhas na primeira vez que abrir a página.**
 
@@ -171,7 +167,7 @@ monitor serial ao ligar e no comando `wifi`.
 
 ## Aviso sonoro
 
-Se o relógio ficar mais de **6 horas** sem ser acertado (GPS sem sinal), cada
+Se o relógio ficar mais de **30 minutos** sem ser conferido (rede fora), cada
 toque dos horários ganha uma batida curta no fim:
 
 ```
@@ -179,10 +175,10 @@ toque normal (1,5 s ou 2,5 s) ... pausa de 0,5 s ... batida de 0,5 s
 ```
 
 O sino continua tocando na hora certa pelo DS3231. O aviso só serve para quem
-ouvir saber que é preciso olhar o sino (antena do GPS, ligações). Ele some
-sozinho quando o GPS volta a acertar o relógio. A página também mostra
-"AVISO SONORO LIGADO". Tempos e liga/desliga em `config.h` (`ALERTA_SEM_GPS_H`,
-`AVISO_SONORO`, `AVISO_PAUSA_MS`, `AVISO_BATIDA_MS`).
+ouvir saber que a rede do sino está fora. Ele some sozinho quando a rede volta
+e a hora é conferida. A página também mostra "AVISO SONORO LIGADO". Tempos e
+liga/desliga em `config.h` (`ALERTA_SEM_ACERTO_MIN`, `AVISO_SONORO`,
+`AVISO_PAUSA_MS`, `AVISO_BATIDA_MS`).
 
 ## LED azul do ESP-12
 
@@ -191,34 +187,39 @@ piscam juntos, o que é um teste visual de que estão sincronizados.
 
 | LED | Significado |
 |---|---|
-| 1 piscada por segundo | tudo certo (corrigido pelo GPS nas últimas 6 h) |
-| 2 piscadas por segundo | funcionando só pelo DS3231; toca normalmente, mas confira a antena |
-| piscando rápido | **sem hora**: não vai tocar (DS3231 sem hora e GPS ainda sem sinal) |
+| 1 piscada por segundo | tudo certo (hora conferida pela rede nos últimos 30 min) |
+| 2 piscadas por segundo | funcionando só pelo DS3231 (rede fora): toca normalmente |
+| piscando rápido | **sem hora**: não vai tocar (DS3231 sem hora e a rede ainda não conferiu) |
 | aceso direto | tocando |
 
 ## Monitor serial (115200 baud, com "Nova linha")
 
 | Comando | O que faz |
 |---|---|
-| `status` | hora, situação do GPS e do RTC, próximo toque |
+| `status` | hora, situação da rede, do RTC e do GPS, próximo toque |
+| `ntp` | confere a hora pela rede agora e mostra a diferença do DS3231 |
 | `horarios` | lista a tabela gravada |
 | `toque` | toque de teste |
 | `gps` | liga/desliga a exibição das mensagens cruas do GPS |
-| `hora 2026-11-02 06:59:50` | acerta a hora local na mão (para teste sem GPS) |
+| `hora 2026-11-02 06:59:50` | acerta a hora local na mão (para teste sem rede) |
 | `wifi` | rede do sino, rede da instituição e o MAC do sino |
 | `senhas-padrao` | volta as senhas do Wi-Fi e da página às do `config.h` e reinicia |
 
-Se o GPS tiver sinal, ele corrige em poucos segundos uma hora acertada na mão.
+Com a rede conectada, a hora acertada na mão é corrigida em poucos segundos.
 
 ## Teste de bancada (antes de instalar)
 
-1. Sem GPS: `hora AAAA-MM-DD 06:59:50` com a data da próxima segunda-feira.
-   Em 10 s o relé deve bater (toque das 07:00 do exemplo).
-2. Pelo celular, abra a página (veja acima), troque as senhas, mude um horário
-   para daqui a 2 minutos, salve e espere o relé bater.
-3. Com o GPS na janela: o `status` deve mostrar `GPS: com sinal` e aparecer
-   `RTC acertado pelo GPS`. Depois disso o LED passa a dar 1 piscada por segundo.
-4. Com dois sinos prontos, ligue os dois lado a lado e veja se os LEDs piscam juntos.
+O roteiro completo, com a montagem na protoboard, está em
+[`../hardware/PROTOBOARD.md`](../hardware/PROTOBOARD.md). Resumo:
+
+1. Pelo celular, abra a página (veja acima), troque as senhas e configure a
+   rede da instituição (em casa, use o roteador de casa ou o do celular).
+2. No monitor serial devem aparecer `Rede: hora conferida` e
+   `RTC acertado pela rede (NTP)`. O LED passa a dar 1 piscada por segundo.
+3. Mude um horário para daqui a 2 minutos, salve e espere o relé bater.
+4. Desligue o roteador: depois de 30 min os toques ganham o aviso sonoro
+   (para testar mais rápido, use `ALERTA_SEM_ACERTO_MIN 2` no `config.h`).
+5. Com dois sinos prontos, ligue os dois lado a lado e veja se os LEDs piscam juntos.
 
 ## Segurança (127 V)
 
@@ -234,21 +235,35 @@ Se o GPS tiver sinal, ele corrige em poucos segundos uma hora acertada na mão.
 
 ## Detalhes técnicos
 
-- **Precisão:** a hora é gravada no DS3231 exatamente na virada do segundo do
-  GPS, e o ESP lê o DS3231 a cada 5 ms. Na simulação, os toques saíram com
-  erro abaixo de 8 ms em relação à hora real. Entre sinos, a diferença depende
-  principalmente de usarem o mesmo modelo de GPS (`GPS_ATRASO_NMEA_MS`). Para
-  comparar: o som leva 20 ms para andar 7 m.
-- **15 minutos após ligar:** logo que é ligado, o GPS pode errar a hora em 1 a
-  3 s até receber dos satélites a tabela de "segundos intercalares". Por isso
-  o DS3231 só é corrigido depois de 15 min de sinal. A exceção é quando o
-  DS3231 está sem hora nenhuma: aí ele é acertado na hora e corrigido de novo
-  15 min depois.
-- **Módulos GPS com data errada:** alguns NEO-6M antigos ou clones informam a
-  data 1024 semanas (~19,6 anos) atrasada. O firmware detecta isso e corrige.
-- **A página não atrapalha a precisão:** enquanto o ESP envia a página, os
-  caracteres do GPS ficam na fila; o firmware desconta esse atraso ao marcar a
-  hora de chegada (e pula o acerto se a fila estiver cheia demais).
+- **Hora pela rede:** a cada 10 min (`INTERVALO_NTP_MIN`) o sino faz 4
+  perguntas ao servidor de hora e fica com a de menor tempo de ida e volta.
+  Se o DS3231 estiver mais de 20 ms fora (`NTP_CORRIGE_ACIMA_MS`), a hora
+  certa é gravada nele exatamente na virada do segundo. Nada disso trava o
+  sino, e nenhuma conferência começa a menos de 15 s de um toque.
+- **Servidores de hora:** primeiro o digitado na página, depois o informado
+  pelo DHCP da rede, depois `a.ntp.br`, `b.ntp.br` e `pool.ntp.br`. Se um falha,
+  o sino passa para o próximo.
+- **Precisão:** o ESP lê o DS3231 a cada 5 ms. Pela rede, a margem de cada
+  conferência é metade do tempo de ida e volta até o servidor: poucos ms com
+  um servidor dentro da instituição, algumas dezenas de ms com o `a.ntp.br`
+  pela internet. O comando `ntp` mostra a margem. Sinos conferidos pelo mesmo
+  servidor ficam mais próximos entre si. Para comparar: o som leva 20 ms para
+  andar 7 m.
+- **Com GPS (opcional):**
+  - a hora é gravada no DS3231 na virada do segundo do GPS. Na simulação, os
+    toques saíram com erro abaixo de 8 ms. Entre sinos com GPS, a diferença
+    depende principalmente de usarem o mesmo modelo de módulo
+    (`GPS_ATRASO_NMEA_MS`);
+  - logo que é ligado, o GPS pode errar a hora em 1 a 3 s até receber dos
+    satélites a tabela de "segundos intercalares". Por isso o DS3231 só é
+    corrigido pelo GPS depois de 15 min de sinal. A exceção é quando o DS3231
+    está sem hora nenhuma: aí ele é acertado na hora e corrigido de novo 15 min
+    depois;
+  - alguns NEO-6M antigos ou clones informam a data 1024 semanas (~19,6 anos)
+    atrasada. O firmware detecta isso e corrige;
+  - enquanto o ESP envia a página, os caracteres do GPS ficam na fila; o
+    firmware desconta esse atraso ao marcar a hora de chegada (e pula o acerto
+    se a fila estiver cheia demais).
 - **Rede da instituição:** se não conectar em 30 s, o sino desiste e tenta de
   novo a cada 10 min (`REDE_INST_ESPERA_MIN`). Enquanto procura a rede, o Wi-Fi
   do sino oscila um pouco; por isso ele não fica tentando o tempo todo.
@@ -260,4 +275,5 @@ Se o GPS tiver sinal, ele corrige em poucos segundos uma hora acertada na mão.
   cd testes
   g++ -std=c++17 -Wall -I../sino_gps teste_logica.cpp -o teste && ./teste
   g++ -std=c++17 -Wall -I../sino_gps teste_web.cpp -o teste_web && ./teste_web
+  g++ -std=c++17 -Wall -I../sino_gps teste_ntp.cpp -o teste_ntp && ./teste_ntp
   ```

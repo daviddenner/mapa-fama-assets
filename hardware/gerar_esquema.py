@@ -125,9 +125,10 @@ def novo_conjunto(*a, **k):
 
 
 # ---------------------------------------------------------------- NodeMCU
-ESQ = ["A0", "RSV@1", "RSV@2", "SD3", "SD2", "SD1", "CMD", "SD0", "CLK", "GND@1", "3V3@1", "EN", "RST", "GND@2", "VIN"]
-DIR = ["D0/GPIO16", "D1/GPIO5", "D2/GPIO4", "D3/GPIO0", "D4/GPIO2", "3V3@2", "GND@3", "D5/GPIO14", "D6/GPIO12",
-       "D7/GPIO13", "D8/GPIO15", "RX", "TX", "GND@4", "3V3@3"]
+# Nomes como estão impressos no NodeMCU v3 (LoLin): G = GND, 3V = 3,3 V, VU = 5 V do USB
+ESQ = ["A0", "G@1", "VU", "S3", "S2", "S1", "SC", "S0", "SK", "G@2", "3V@1", "EN", "RST", "G@3", "VIN"]
+DIR = ["D0/GPIO16", "D1/GPIO5", "D2/GPIO4", "D3/GPIO0", "D4/GPIO2", "3V@2", "G@4", "D5/GPIO14", "D6/GPIO12",
+       "D7/GPIO13", "D8/GPIO15", "RX", "TX", "G@5", "3V@3"]
 
 s = novo_simbolo("NODEMCU")
 s.caixa(-15.24, 20.32, 15.24, -20.32)
@@ -138,21 +139,21 @@ for i, n in enumerate(ESQ):
 for i, n in enumerate(DIR):
     s.pino(n, 20.32, 17.78 - i * G, comp="middle", rot=180, visivel="pin")
 
-p = novo_pacote("NODEMCU-V2", "NodeMCU v2 (Amica): 2 fileiras de 15 pinos a 0,9\" (22,86 mm). "
-                              "O NodeMCU v3 (LoLin) e mais largo: 1,1\" (27,94 mm).")
+p = novo_pacote("NODEMCU-V3", "NodeMCU v3 (LoLin): 2 fileiras de 15 pinos a 1,1\" (27,94 mm); placa de "
+                              "31 x 58 mm (contorno aproximado). Pino 1 = A0, antena para cima.")
 for i in range(15):
     p.furo(str(i + 1), 0, -i * G, 1.0, 1.8, "square" if i == 0 else None)
-    p.furo(str(i + 16), 22.86, -i * G, 1.0, 1.8)
-p.caixa(-1.6, 6.0, 24.46, -42.3)
-p.fio(8.4, 6.0, 14.46, 6.0, 0.6)  # lado do conector USB
-p.nomes(0, 8.0)
+    p.furo(str(i + 16), 27.94, -i * G, 1.0, 1.8)
+p.caixa(-1.53, 12.7, 29.47, -45.3)
+p.fio(10.47, -45.3, 17.47, -45.3, 0.6)  # lado do conector USB
+p.nomes(0, 14.0)
 ligs = {}
 for i, n in enumerate(ESQ):
     ligs[("G$1", n)] = str(i + 1)
 for i, n in enumerate(DIR):
     ligs[("G$1", n)] = str(i + 16)
 novo_conjunto("NODEMCU", "U", [("G$1", "NODEMCU", 0, 0)],
-              "NodeMCU (ESP-12E / ESP8266)").variante("", "NODEMCU-V2", ligs)
+              "NodeMCU v3 LoLin (ESP-12E / ESP8266)").variante("", "NODEMCU-V3", ligs)
 
 # ------------------------------------------------- RTC DS3231 (lado de 4 pinos)
 s = novo_simbolo("RTC_DS3231")
@@ -501,7 +502,7 @@ def ramo(rede, de, ate, via=None, juncoes=(), alim=False):
 
 
 # ----------------------------------------------------------------- peças
-E.peca("U1", "NODEMCU", "", "NodeMCU ESP-12E")
+E.peca("U1", "NODEMCU", "", "NodeMCU v3 LoLin")
 E.peca("U2", "RTC_DS3231", "", "DS3231 ZS-042")
 E.peca("K1", "RELE_5V", "", "SRD-05VDC-SL-C")
 E.peca("Q1", "BC548", "", "BC548")
@@ -557,9 +558,9 @@ ramo("GND", ("C2", "G$1", "1"), (68.58, 144.78))
 
 # NodeMCU: tudo por rótulos
 toco("+5V", "U1", "G$1", "VIN", "esq")
-toco("GND", "U1", "G$1", "GND@2", "esq")
-toco("GND", "U1", "G$1", "GND@4", "dir")
-toco("+3V3", "U1", "G$1", "3V3@3", "dir")
+toco("GND", "U1", "G$1", "G@3", "esq")
+toco("GND", "U1", "G$1", "G@5", "dir")
+toco("+3V3", "U1", "G$1", "3V@3", "dir")
 toco("SCL", "U1", "G$1", "D1/GPIO5", "dir")
 toco("SDA", "U1", "G$1", "D2/GPIO4", "dir")
 toco("GPS_TX", "U1", "G$1", "D5/GPIO14", "dir")
@@ -612,7 +613,7 @@ ramo("SINO", (251.46, 53.34), ("J2", "G$1", "2"), via=[(251.46, 38.1), (182.88, 
 # ---------------------------------------------------------------- textos
 TITULOS = [
     (12.7, 177.8, "ALIMENTACAO 5V"),
-    (73.66, 139.7, "NODEMCU (ESP-12E)"),
+    (73.66, 139.7, "NODEMCU V3 (LOLIN)"),
     (182.88, 175.26, "RELOGIO DS3231 - LADO DE 4 PINOS"),
     (182.88, 147.32, "GPS (OPCIONAL)"),
     (213.36, 142.24, "ACIONAMENTO DO RELE"),
@@ -622,12 +623,12 @@ TITULOS = [
 NOTAS = [
     "NOTAS",
     "1. Fonte 5V (ex.: HLK-PM01) em J1: alimenta o rele e o NodeMCU pelo pino VIN.",
-    "2. O 3V3 do NodeMCU alimenta o RTC. Use bateria CR2032 no modulo.",
+    "2. O 3V do NodeMCU alimenta o RTC (bateria CR2032). VU = 5V do USB: nao ligar.",
     "3. Q1 liga o rele com D6/GPIO12 em nivel ALTO: no firmware, RELE_ATIVO_EM_BAIXO = false.",
     "4. R2 mantem o rele desligado enquanto o ESP liga ou e gravado.",
     "5. D1 = diodo de roda livre (catodo no +5V). Rele com mais de 90 mA: troque Q1 por BC337.",
-    "6. RTC: lado de 4 pinos do ZS-042 (SCL, SDA, VCC, GND). Confira a ordem impressa no modulo.",
-    "7. Gravar o firmware: USB do NodeMCU. Mudar horarios: Wi-Fi do sino, http://192.168.4.1",
+    "6. RTC: lado de 4 pinos do ZS-042, na ordem impressa no modulo: SCL, SDA, VCC, GND.",
+    "7. Hora certa pela rede (NTP); o DS3231 segura a hora quando a rede cai. J3 (GPS) e opcional.",
     "8. 127V: fase -> J2.1 -> F1 -> COM; NA -> J2.2 -> sino; neutro direto no sino.",
     "9. Snubber R4+C3 opcional (protege o contato e evita reset do ESP).",
     "10. Na placa: deixar 6 mm ou mais entre a parte de 127V e o resto do circuito.",
@@ -866,7 +867,7 @@ def montar_plano():
     for (a1, b1, a2, b2) in ((x0, y1, x1, y1), (x0, y0, x0, y1), (x0, 12.7, x1, 12.7)):
         E.plano.append(("wire", (a1, b1, a2, b2, 0.254, 94)))
     E.plano.append(("text", (185.42, 16.51, "SINO IFMS - CONTROLADOR DO SINO", 2.54, 94)))
-    E.plano.append(("text", (185.42, 6.35, "NodeMCU + DS3231 + rele 5V   Rev. 2   2026-11-13", 1.778, 94)))
+    E.plano.append(("text", (185.42, 6.35, "NodeMCU v3 + DS3231 + rele 5V   Rev. 3   2026-11-13", 1.778, 94)))
     E.plano.append(("text", (185.42, 2.54, "Firmware: sino-gps/sino_gps", 1.778, 94)))
 
 

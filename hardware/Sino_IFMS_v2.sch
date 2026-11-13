@@ -74,45 +74,45 @@
 <library name="sino_ifms">
 <description>Biblioteca do projeto Sino IFMS (gerada automaticamente).</description>
 <packages>
-<package name="NODEMCU-V2">
-<description>NodeMCU v2 (Amica): 2 fileiras de 15 pinos a 0,9" (22,86 mm). O NodeMCU v3 (LoLin) e mais largo: 1,1" (27,94 mm).</description>
+<package name="NODEMCU-V3">
+<description>NodeMCU v3 (LoLin): 2 fileiras de 15 pinos a 1,1" (27,94 mm); placa de 31 x 58 mm (contorno aproximado). Pino 1 = A0, antena para cima.</description>
 <pad name="1" x="0" y="0" drill="1" diameter="1.8" shape="square"/>
-<pad name="16" x="22.86" y="0" drill="1" diameter="1.8"/>
+<pad name="16" x="27.94" y="0" drill="1" diameter="1.8"/>
 <pad name="2" x="0" y="-2.54" drill="1" diameter="1.8"/>
-<pad name="17" x="22.86" y="-2.54" drill="1" diameter="1.8"/>
+<pad name="17" x="27.94" y="-2.54" drill="1" diameter="1.8"/>
 <pad name="3" x="0" y="-5.08" drill="1" diameter="1.8"/>
-<pad name="18" x="22.86" y="-5.08" drill="1" diameter="1.8"/>
+<pad name="18" x="27.94" y="-5.08" drill="1" diameter="1.8"/>
 <pad name="4" x="0" y="-7.62" drill="1" diameter="1.8"/>
-<pad name="19" x="22.86" y="-7.62" drill="1" diameter="1.8"/>
+<pad name="19" x="27.94" y="-7.62" drill="1" diameter="1.8"/>
 <pad name="5" x="0" y="-10.16" drill="1" diameter="1.8"/>
-<pad name="20" x="22.86" y="-10.16" drill="1" diameter="1.8"/>
+<pad name="20" x="27.94" y="-10.16" drill="1" diameter="1.8"/>
 <pad name="6" x="0" y="-12.7" drill="1" diameter="1.8"/>
-<pad name="21" x="22.86" y="-12.7" drill="1" diameter="1.8"/>
+<pad name="21" x="27.94" y="-12.7" drill="1" diameter="1.8"/>
 <pad name="7" x="0" y="-15.24" drill="1" diameter="1.8"/>
-<pad name="22" x="22.86" y="-15.24" drill="1" diameter="1.8"/>
+<pad name="22" x="27.94" y="-15.24" drill="1" diameter="1.8"/>
 <pad name="8" x="0" y="-17.78" drill="1" diameter="1.8"/>
-<pad name="23" x="22.86" y="-17.78" drill="1" diameter="1.8"/>
+<pad name="23" x="27.94" y="-17.78" drill="1" diameter="1.8"/>
 <pad name="9" x="0" y="-20.32" drill="1" diameter="1.8"/>
-<pad name="24" x="22.86" y="-20.32" drill="1" diameter="1.8"/>
+<pad name="24" x="27.94" y="-20.32" drill="1" diameter="1.8"/>
 <pad name="10" x="0" y="-22.86" drill="1" diameter="1.8"/>
-<pad name="25" x="22.86" y="-22.86" drill="1" diameter="1.8"/>
+<pad name="25" x="27.94" y="-22.86" drill="1" diameter="1.8"/>
 <pad name="11" x="0" y="-25.4" drill="1" diameter="1.8"/>
-<pad name="26" x="22.86" y="-25.4" drill="1" diameter="1.8"/>
+<pad name="26" x="27.94" y="-25.4" drill="1" diameter="1.8"/>
 <pad name="12" x="0" y="-27.94" drill="1" diameter="1.8"/>
-<pad name="27" x="22.86" y="-27.94" drill="1" diameter="1.8"/>
+<pad name="27" x="27.94" y="-27.94" drill="1" diameter="1.8"/>
 <pad name="13" x="0" y="-30.48" drill="1" diameter="1.8"/>
-<pad name="28" x="22.86" y="-30.48" drill="1" diameter="1.8"/>
+<pad name="28" x="27.94" y="-30.48" drill="1" diameter="1.8"/>
 <pad name="14" x="0" y="-33.02" drill="1" diameter="1.8"/>
-<pad name="29" x="22.86" y="-33.02" drill="1" diameter="1.8"/>
+<pad name="29" x="27.94" y="-33.02" drill="1" diameter="1.8"/>
 <pad name="15" x="0" y="-35.56" drill="1" diameter="1.8"/>
-<pad name="30" x="22.86" y="-35.56" drill="1" diameter="1.8"/>
-<wire x1="-1.6" y1="6" x2="24.46" y2="6" width="0.2032" layer="21"/>
-<wire x1="24.46" y1="6" x2="24.46" y2="-42.3" width="0.2032" layer="21"/>
-<wire x1="24.46" y1="-42.3" x2="-1.6" y2="-42.3" width="0.2032" layer="21"/>
-<wire x1="-1.6" y1="-42.3" x2="-1.6" y2="6" width="0.2032" layer="21"/>
-<wire x1="8.4" y1="6" x2="14.46" y2="6" width="0.6" layer="21"/>
-<text x="0" y="8" size="1.27" layer="25">&gt;NAME</text>
-<text x="0" y="6.095" size="1.27" layer="27">&gt;VALUE</text>
+<pad name="30" x="27.94" y="-35.56" drill="1" diameter="1.8"/>
+<wire x1="-1.53" y1="12.7" x2="29.47" y2="12.7" width="0.2032" layer="21"/>
+<wire x1="29.47" y1="12.7" x2="29.47" y2="-45.3" width="0.2032" layer="21"/>
+<wire x1="29.47" y1="-45.3" x2="-1.53" y2="-45.3" width="0.2032" layer="21"/>
+<wire x1="-1.53" y1="-45.3" x2="-1.53" y2="12.7" width="0.2032" layer="21"/>
+<wire x1="10.47" y1="-45.3" x2="17.47" y2="-45.3" width="0.6" layer="21"/>
+<text x="0" y="14" size="1.27" layer="25">&gt;NAME</text>
+<text x="0" y="12.095" size="1.27" layer="27">&gt;VALUE</text>
 </package>
 <package name="MOD-4P">
 <description>Barra de 4 pinos 2,54 mm do modulo DS3231 (ZS-042). Confira a ordem no modulo.</description>
@@ -293,35 +293,35 @@
 <text x="0" y="21.59" size="1.778" layer="95" align="bottom-center">&gt;NAME</text>
 <text x="0" y="-21.59" size="1.778" layer="96" align="top-center">&gt;VALUE</text>
 <pin name="A0" x="-20.32" y="17.78" visible="pin" length="middle" direction="pas"/>
-<pin name="RSV@1" x="-20.32" y="15.24" visible="pin" length="middle" direction="pas"/>
-<pin name="RSV@2" x="-20.32" y="12.7" visible="pin" length="middle" direction="pas"/>
-<pin name="SD3" x="-20.32" y="10.16" visible="pin" length="middle" direction="pas"/>
-<pin name="SD2" x="-20.32" y="7.62" visible="pin" length="middle" direction="pas"/>
-<pin name="SD1" x="-20.32" y="5.08" visible="pin" length="middle" direction="pas"/>
-<pin name="CMD" x="-20.32" y="2.54" visible="pin" length="middle" direction="pas"/>
-<pin name="SD0" x="-20.32" y="0" visible="pin" length="middle" direction="pas"/>
-<pin name="CLK" x="-20.32" y="-2.54" visible="pin" length="middle" direction="pas"/>
-<pin name="GND@1" x="-20.32" y="-5.08" visible="pin" length="middle" direction="pas"/>
-<pin name="3V3@1" x="-20.32" y="-7.62" visible="pin" length="middle" direction="pas"/>
+<pin name="G@1" x="-20.32" y="15.24" visible="pin" length="middle" direction="pas"/>
+<pin name="VU" x="-20.32" y="12.7" visible="pin" length="middle" direction="pas"/>
+<pin name="S3" x="-20.32" y="10.16" visible="pin" length="middle" direction="pas"/>
+<pin name="S2" x="-20.32" y="7.62" visible="pin" length="middle" direction="pas"/>
+<pin name="S1" x="-20.32" y="5.08" visible="pin" length="middle" direction="pas"/>
+<pin name="SC" x="-20.32" y="2.54" visible="pin" length="middle" direction="pas"/>
+<pin name="S0" x="-20.32" y="0" visible="pin" length="middle" direction="pas"/>
+<pin name="SK" x="-20.32" y="-2.54" visible="pin" length="middle" direction="pas"/>
+<pin name="G@2" x="-20.32" y="-5.08" visible="pin" length="middle" direction="pas"/>
+<pin name="3V@1" x="-20.32" y="-7.62" visible="pin" length="middle" direction="pas"/>
 <pin name="EN" x="-20.32" y="-10.16" visible="pin" length="middle" direction="pas"/>
 <pin name="RST" x="-20.32" y="-12.7" visible="pin" length="middle" direction="pas"/>
-<pin name="GND@2" x="-20.32" y="-15.24" visible="pin" length="middle" direction="pas"/>
+<pin name="G@3" x="-20.32" y="-15.24" visible="pin" length="middle" direction="pas"/>
 <pin name="VIN" x="-20.32" y="-17.78" visible="pin" length="middle" direction="pas"/>
 <pin name="D0/GPIO16" x="20.32" y="17.78" visible="pin" length="middle" direction="pas" rot="R180"/>
 <pin name="D1/GPIO5" x="20.32" y="15.24" visible="pin" length="middle" direction="pas" rot="R180"/>
 <pin name="D2/GPIO4" x="20.32" y="12.7" visible="pin" length="middle" direction="pas" rot="R180"/>
 <pin name="D3/GPIO0" x="20.32" y="10.16" visible="pin" length="middle" direction="pas" rot="R180"/>
 <pin name="D4/GPIO2" x="20.32" y="7.62" visible="pin" length="middle" direction="pas" rot="R180"/>
-<pin name="3V3@2" x="20.32" y="5.08" visible="pin" length="middle" direction="pas" rot="R180"/>
-<pin name="GND@3" x="20.32" y="2.54" visible="pin" length="middle" direction="pas" rot="R180"/>
+<pin name="3V@2" x="20.32" y="5.08" visible="pin" length="middle" direction="pas" rot="R180"/>
+<pin name="G@4" x="20.32" y="2.54" visible="pin" length="middle" direction="pas" rot="R180"/>
 <pin name="D5/GPIO14" x="20.32" y="0" visible="pin" length="middle" direction="pas" rot="R180"/>
 <pin name="D6/GPIO12" x="20.32" y="-2.54" visible="pin" length="middle" direction="pas" rot="R180"/>
 <pin name="D7/GPIO13" x="20.32" y="-5.08" visible="pin" length="middle" direction="pas" rot="R180"/>
 <pin name="D8/GPIO15" x="20.32" y="-7.62" visible="pin" length="middle" direction="pas" rot="R180"/>
 <pin name="RX" x="20.32" y="-10.16" visible="pin" length="middle" direction="pas" rot="R180"/>
 <pin name="TX" x="20.32" y="-12.7" visible="pin" length="middle" direction="pas" rot="R180"/>
-<pin name="GND@4" x="20.32" y="-15.24" visible="pin" length="middle" direction="pas" rot="R180"/>
-<pin name="3V3@3" x="20.32" y="-17.78" visible="pin" length="middle" direction="pas" rot="R180"/>
+<pin name="G@5" x="20.32" y="-15.24" visible="pin" length="middle" direction="pas" rot="R180"/>
+<pin name="3V@3" x="20.32" y="-17.78" visible="pin" length="middle" direction="pas" rot="R180"/>
 </symbol>
 <symbol name="RTC_DS3231">
 <wire x1="-7.62" y1="6.35" x2="10.16" y2="6.35" width="0.4064" layer="94"/>
@@ -526,43 +526,43 @@
 </symbols>
 <devicesets>
 <deviceset name="NODEMCU" prefix="U" uservalue="yes">
-<description>NodeMCU (ESP-12E / ESP8266)</description>
+<description>NodeMCU v3 LoLin (ESP-12E / ESP8266)</description>
 <gates>
 <gate name="G$1" symbol="NODEMCU" x="0" y="0"/>
 </gates>
 <devices>
-<device name="" package="NODEMCU-V2">
+<device name="" package="NODEMCU-V3">
 <connects>
 <connect gate="G$1" pin="A0" pad="1"/>
-<connect gate="G$1" pin="RSV@1" pad="2"/>
-<connect gate="G$1" pin="RSV@2" pad="3"/>
-<connect gate="G$1" pin="SD3" pad="4"/>
-<connect gate="G$1" pin="SD2" pad="5"/>
-<connect gate="G$1" pin="SD1" pad="6"/>
-<connect gate="G$1" pin="CMD" pad="7"/>
-<connect gate="G$1" pin="SD0" pad="8"/>
-<connect gate="G$1" pin="CLK" pad="9"/>
-<connect gate="G$1" pin="GND@1" pad="10"/>
-<connect gate="G$1" pin="3V3@1" pad="11"/>
+<connect gate="G$1" pin="G@1" pad="2"/>
+<connect gate="G$1" pin="VU" pad="3"/>
+<connect gate="G$1" pin="S3" pad="4"/>
+<connect gate="G$1" pin="S2" pad="5"/>
+<connect gate="G$1" pin="S1" pad="6"/>
+<connect gate="G$1" pin="SC" pad="7"/>
+<connect gate="G$1" pin="S0" pad="8"/>
+<connect gate="G$1" pin="SK" pad="9"/>
+<connect gate="G$1" pin="G@2" pad="10"/>
+<connect gate="G$1" pin="3V@1" pad="11"/>
 <connect gate="G$1" pin="EN" pad="12"/>
 <connect gate="G$1" pin="RST" pad="13"/>
-<connect gate="G$1" pin="GND@2" pad="14"/>
+<connect gate="G$1" pin="G@3" pad="14"/>
 <connect gate="G$1" pin="VIN" pad="15"/>
 <connect gate="G$1" pin="D0/GPIO16" pad="16"/>
 <connect gate="G$1" pin="D1/GPIO5" pad="17"/>
 <connect gate="G$1" pin="D2/GPIO4" pad="18"/>
 <connect gate="G$1" pin="D3/GPIO0" pad="19"/>
 <connect gate="G$1" pin="D4/GPIO2" pad="20"/>
-<connect gate="G$1" pin="3V3@2" pad="21"/>
-<connect gate="G$1" pin="GND@3" pad="22"/>
+<connect gate="G$1" pin="3V@2" pad="21"/>
+<connect gate="G$1" pin="G@4" pad="22"/>
 <connect gate="G$1" pin="D5/GPIO14" pad="23"/>
 <connect gate="G$1" pin="D6/GPIO12" pad="24"/>
 <connect gate="G$1" pin="D7/GPIO13" pad="25"/>
 <connect gate="G$1" pin="D8/GPIO15" pad="26"/>
 <connect gate="G$1" pin="RX" pad="27"/>
 <connect gate="G$1" pin="TX" pad="28"/>
-<connect gate="G$1" pin="GND@4" pad="29"/>
-<connect gate="G$1" pin="3V3@3" pad="30"/>
+<connect gate="G$1" pin="G@5" pad="29"/>
+<connect gate="G$1" pin="3V@3" pad="30"/>
 </connects>
 <technologies>
 <technology name=""/>
@@ -852,7 +852,7 @@
 </class>
 </classes>
 <parts>
-<part name="U1" library="sino_ifms" deviceset="NODEMCU" device="" value="NodeMCU ESP-12E"/>
+<part name="U1" library="sino_ifms" deviceset="NODEMCU" device="" value="NodeMCU v3 LoLin"/>
 <part name="U2" library="sino_ifms" deviceset="RTC_DS3231" device="" value="DS3231 ZS-042"/>
 <part name="K1" library="sino_ifms" deviceset="RELE_5V" device="" value="SRD-05VDC-SL-C"/>
 <part name="Q1" library="sino_ifms" deviceset="BC548" device="" value="BC548"/>
@@ -885,7 +885,7 @@
 <wire x1="279.4" y1="190.5" x2="0" y2="190.5" width="0.4064" layer="94"/>
 <wire x1="0" y1="190.5" x2="0" y2="0" width="0.4064" layer="94"/>
 <text x="12.7" y="177.8" size="2.1844" layer="97">ALIMENTACAO 5V</text>
-<text x="73.66" y="139.7" size="2.1844" layer="97">NODEMCU (ESP-12E)</text>
+<text x="73.66" y="139.7" size="2.1844" layer="97">NODEMCU V3 (LOLIN)</text>
 <text x="182.88" y="175.26" size="2.1844" layer="97">RELOGIO DS3231 - LADO DE 4 PINOS</text>
 <text x="182.88" y="147.32" size="2.1844" layer="97">GPS (OPCIONAL)</text>
 <text x="213.36" y="142.24" size="2.1844" layer="97">ACIONAMENTO DO RELE</text>
@@ -893,12 +893,12 @@
 <text x="167.64" y="71.12" size="2.1844" layer="97">SAIDA 127V PARA O SINO</text>
 <text x="7.62" y="72.39" size="2.1844" layer="97">NOTAS</text>
 <text x="7.62" y="68.58" size="1.778" layer="97">1. Fonte 5V (ex.: HLK-PM01) em J1: alimenta o rele e o NodeMCU pelo pino VIN.</text>
-<text x="7.62" y="64.77" size="1.778" layer="97">2. O 3V3 do NodeMCU alimenta o RTC. Use bateria CR2032 no modulo.</text>
+<text x="7.62" y="64.77" size="1.778" layer="97">2. O 3V do NodeMCU alimenta o RTC (bateria CR2032). VU = 5V do USB: nao ligar.</text>
 <text x="7.62" y="60.96" size="1.778" layer="97">3. Q1 liga o rele com D6/GPIO12 em nivel ALTO: no firmware, RELE_ATIVO_EM_BAIXO = false.</text>
 <text x="7.62" y="57.15" size="1.778" layer="97">4. R2 mantem o rele desligado enquanto o ESP liga ou e gravado.</text>
 <text x="7.62" y="53.34" size="1.778" layer="97">5. D1 = diodo de roda livre (catodo no +5V). Rele com mais de 90 mA: troque Q1 por BC337.</text>
-<text x="7.62" y="49.53" size="1.778" layer="97">6. RTC: lado de 4 pinos do ZS-042 (SCL, SDA, VCC, GND). Confira a ordem impressa no modulo.</text>
-<text x="7.62" y="45.72" size="1.778" layer="97">7. Gravar o firmware: USB do NodeMCU. Mudar horarios: Wi-Fi do sino, http://192.168.4.1</text>
+<text x="7.62" y="49.53" size="1.778" layer="97">6. RTC: lado de 4 pinos do ZS-042, na ordem impressa no modulo: SCL, SDA, VCC, GND.</text>
+<text x="7.62" y="45.72" size="1.778" layer="97">7. Hora certa pela rede (NTP); o DS3231 segura a hora quando a rede cai. J3 (GPS) e opcional.</text>
 <text x="7.62" y="41.91" size="1.778" layer="97">8. 127V: fase -&gt; J2.1 -&gt; F1 -&gt; COM; NA -&gt; J2.2 -&gt; sino; neutro direto no sino.</text>
 <text x="7.62" y="38.1" size="1.778" layer="97">9. Snubber R4+C3 opcional (protege o contato e evita reset do ESP).</text>
 <text x="7.62" y="34.29" size="1.778" layer="97">10. Na placa: deixar 6 mm ou mais entre a parte de 127V e o resto do circuito.</text>
@@ -906,7 +906,7 @@
 <wire x1="182.88" y1="0" x2="182.88" y2="22.86" width="0.254" layer="94"/>
 <wire x1="182.88" y1="12.7" x2="279.4" y2="12.7" width="0.254" layer="94"/>
 <text x="185.42" y="16.51" size="2.54" layer="94">SINO IFMS - CONTROLADOR DO SINO</text>
-<text x="185.42" y="6.35" size="1.778" layer="94">NodeMCU + DS3231 + rele 5V   Rev. 2   2026-11-13</text>
+<text x="185.42" y="6.35" size="1.778" layer="94">NodeMCU v3 + DS3231 + rele 5V   Rev. 3   2026-11-13</text>
 <text x="185.42" y="2.54" size="1.778" layer="94">Firmware: sino-gps/sino_gps</text>
 </plain>
 <instances>
@@ -1016,12 +1016,12 @@
 <wire x1="68.58" y1="152.4" x2="68.58" y2="144.78" width="0.1524" layer="91"/>
 </segment>
 <segment>
-<pinref part="U1" gate="G$1" pin="GND@2"/>
+<pinref part="U1" gate="G$1" pin="G@3"/>
 <wire x1="83.82" y1="99.06" x2="76.2" y2="99.06" width="0.1524" layer="91"/>
 <label x="76.2" y="99.06" size="1.778" layer="95" rot="R180"/>
 </segment>
 <segment>
-<pinref part="U1" gate="G$1" pin="GND@4"/>
+<pinref part="U1" gate="G$1" pin="G@5"/>
 <wire x1="124.46" y1="99.06" x2="132.08" y2="99.06" width="0.1524" layer="91"/>
 <label x="132.08" y="99.06" size="1.778" layer="95"/>
 </segment>
@@ -1054,7 +1054,7 @@
 </net>
 <net name="+3V3" class="0">
 <segment>
-<pinref part="U1" gate="G$1" pin="3V3@3"/>
+<pinref part="U1" gate="G$1" pin="3V@3"/>
 <wire x1="124.46" y1="96.52" x2="132.08" y2="96.52" width="0.1524" layer="91"/>
 <label x="132.08" y="96.52" size="1.778" layer="95"/>
 </segment>
