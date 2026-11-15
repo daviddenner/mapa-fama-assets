@@ -338,3 +338,62 @@ inline const char *nomeSeguranca(int m) {
     default: return "outra";
   }
 }
+
+// ============================================================ Outras fontes
+// Escreve um inteiro de 32 bits em "big-endian" (ordem da rede).
+inline void escreverU32(uint8_t *p, uint32_t v) {
+  p[0] = v >> 24;
+  p[1] = v >> 16;
+  p[2] = v >> 8;
+  p[3] = v;
+}
+
+// Soma de verificação do ICMP (complemento de 1, 16 bits).
+inline uint16_t somaIcmp(const uint8_t *d, int n) {
+  uint32_t s = 0;
+  for (int i = 0; i + 1 < n; i += 2) s += (uint32_t)d[i] << 8 | d[i + 1];
+  if (n & 1) s += (uint32_t)d[n - 1] << 8;
+  while (s >> 16) s = (s & 0xFFFF) + (s >> 16);
+  return (uint16_t)~s;
+}
+
+// Monta um pedido ICMP "timestamp" (tipo 13, RFC 792): 20 bytes.
+inline void montarIcmpTimestamp(uint8_t *p, uint16_t id, uint16_t seq, uint32_t origemMs) {
+  memset(p, 0, 20);
+  p[0] = 13;
+  p[4] = id >> 8;
+  p[5] = id;
+  p[6] = seq >> 8;
+  p[7] = seq;
+  escreverU32(p + 8, origemMs);
+  const uint16_t s = somaIcmp(p, 20);
+  p[2] = s >> 8;
+  p[3] = s;
+}
+
+// Lê a resposta (tipo 14). 'p' é o pacote IP inteiro, como vem do socket cru.
+// Devolve os carimbos do aparelho: ms desde a meia-noite UTC.
+inline bool lerIcmpTimestamp(const uint8_t *p, int n, uint16_t id, uint16_t seq, uint32_t &recebMs,
+                             uint32_t &envioMs) {
+  if (n < 20 || (p[0] >> 4) != 4) return false;
+  const int ihl = (p[0] & 0x0F) * 4;
+  if (ihl < 20 || n < ihl + 20) return false;
+  const uint8_t *ic = p + ihl;
+  if (ic[0] != 14 || ic[1] != 0) return false;
+  if ((ic[4] << 8 | ic[5]) != id || (ic[6] << 8 | ic[7]) != seq) return false;
+  recebMs = lerU32(ic + 12);
+  envioMs = lerU32(ic + 16);
+  // bit mais alto ligado = "nao padrao" (aparelho sem hora UTC); acima de 1 dia = lixo
+  return !(envioMs & 0x80000000UL) && envioMs < 86400000UL;
+}
+
+// Protocolo TIME (RFC 868, porta 37): 4 bytes, segundos desde 1900.
+inline uint32_t epochDoTime868(const uint8_t *b) { return lerU32(b) - NTP_1900_PARA_1970; }
+
+// Diferença entre dois instantes do dia (ms), no intervalo (-12 h, +12 h].
+inline int32_t diferencaNoDiaMs(uint32_t aMs, uint32_t bMs) {
+  int64_t d = (int64_t)aMs - (int64_t)bMs;
+  if (d > 43200000LL) d -= 86400000LL;
+  if (d <= -43200000LL) d += 86400000LL;
+  return (int32_t)d;
+}

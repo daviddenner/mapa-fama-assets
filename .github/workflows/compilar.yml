@@ -57,12 +57,15 @@ jobs:
         run: arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 --warnings default sino-gps/sino_gps
 
   teste-rede-esp32:
-    name: Teste de rede (ESP32 ${{ matrix.versao }})
+    name: Teste de rede (${{ matrix.placa.nome }}, pacote ${{ matrix.versao }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         versao: ["2.0.17", "ultima"]
+        placa:
+          - { nome: "ESP32 Dev Module", fqbn: "esp32:esp32:esp32" }
+          - { nome: "ESP32-C3 Dev Module", fqbn: "esp32:esp32:esp32c3:CDCOnBoot=cdc" }
     steps:
       - uses: actions/checkout@v4
       - uses: arduino/setup-arduino-cli@v2
@@ -73,4 +76,4 @@ jobs:
           arduino-cli core install "$NUCLEO" --additional-urls "$URL_ESP32"
           arduino-cli core list
       - name: Compilar
-        run: arduino-cli compile --fqbn esp32:esp32:esp32 --warnings default teste-rede-esp32/teste_rede
+        run: arduino-cli compile --fqbn "${{ matrix.placa.fqbn }}" --warnings default teste-rede-esp32/teste_rede

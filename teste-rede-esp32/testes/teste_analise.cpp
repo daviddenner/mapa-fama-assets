@@ -147,6 +147,30 @@ int main() {
   CHECA(strstr(motivoQueda(201), "nao encontrada") && strcmp(motivoQueda(999), "outro motivo") == 0);
   CHECA(!strcmp(nomeSeguranca(0), "aberta") && strstr(nomeSeguranca(5), "Enterprise"));
 
+  // ------------------------------------------------- ICMP timestamp e TIME
+  uint8_t pk[20];
+  montarIcmpTimestamp(pk, 0x5153, 7, 123456);
+  CHECA(pk[0] == 13 && somaIcmp(pk, 20) == 0 && lerU32(pk + 8) == 123456);
+  uint8_t resp[40] = {0x45, 0, 0, 40};  // cabeçalho IP de 20 bytes + ICMP
+  memcpy(resp + 20, pk, 20);
+  resp[20] = 14;                           // tipo: resposta
+  escreverU32(resp + 32, 43200000UL + 5);  // recebido: 12:00:00,005 UTC
+  escreverU32(resp + 36, 43200000UL + 6);  // enviado
+  uint32_t rec, env;
+  CHECA(lerIcmpTimestamp(resp, 40, 0x5153, 7, rec, env) && rec == 43200005UL && env == 43200006UL);
+  CHECA(!lerIcmpTimestamp(resp, 40, 0x5153, 8, rec, env));  // outra sequência
+  resp[20] = 13;
+  CHECA(!lerIcmpTimestamp(resp, 40, 0x5153, 7, rec, env));  // é um pedido, não resposta
+  resp[20] = 14;
+  escreverU32(resp + 36, 0x80000000UL | 1234);  // "nao padrao"
+  CHECA(!lerIcmpTimestamp(resp, 40, 0x5153, 7, rec, env));
+  CHECA(!lerIcmpTimestamp(resp, 30, 0x5153, 7, rec, env));  // curto demais
+  uint8_t t868[4];
+  escreverU32(t868, 1793620800UL + NTP_1900_PARA_1970);
+  CHECA(epochDoTime868(t868) == 1793620800UL);
+  CHECA(diferencaNoDiaMs(100, 86400000UL - 100) == 200 && diferencaNoDiaMs(86400000UL - 100, 100) == -200);
+  CHECA(diferencaNoDiaMs(5000, 2000) == 3000);
+
   if (falhas == 0) std::printf("OK: todos os testes passaram\n");
   return falhas ? 1 : 0;
 }
