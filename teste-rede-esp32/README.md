@@ -29,7 +29,9 @@ precisa de computador.
      (sem isso o monitor serial fica mudo; a página continua funcionando).
      Se a IDE não achar a porta, segure BOOT, aperte RST, solte BOOT e grave.
    - **ESP32 comum**: `ESP32 Dev Module`.
-   - Partition Scheme: o padrão ("Default 4MB with spiffs") serve.
+   - Partition Scheme: o padrão ("Default 4MB with spiffs") serve. Com o
+     pacote esp32 3.x o programa ocupa 93% dele; se a IDE reclamar que o
+     sketch é grande demais, escolha **"Huge APP (3MB No OTA/1MB SPIFFS)"**.
 4. Grave, abra o Monitor Serial em **115200** e espere a mensagem inicial.
 
 > **ESP32-C3 "Super Mini":** muitas dessas plaquinhas têm a antena mal
