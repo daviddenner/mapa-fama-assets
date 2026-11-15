@@ -121,6 +121,27 @@ Só para quem quiser a hora também sem rede nenhuma. Ligue o TX do GPS no D5
 - Em sala sem sinal nenhum, use um módulo GPS com conector SMA e uma antena
   ativa externa do lado de fora.
 
+## Hora sem login na rede (portal com captcha)
+
+Na rede da instituição, quem não está cadastrado cai numa página de login. O
+sino **não tenta passar por ela**: ele usa só o que a rede oferece a qualquer
+aparelho conectado. Antes do login, a navegação é desviada para o portal, mas
+os servidores da própria rede costumam continuar respondendo à hora (NTP):
+
+- o servidor de hora que o DHCP informa, se a TI configurou um;
+- o **roteador** da rede (muitos têm servidor de hora ligado);
+- os **servidores DNS** da rede, que em rede com domínio Windows costumam ser
+  os controladores de domínio, e eles respondem à hora por padrão.
+
+O sino tenta esses primeiro, antes dos servidores da internet. Se algum
+responder, o relógio fica conferido **mesmo com o MAC apagado**: o cadastro
+passa a importar só para abrir a página pela rede da instituição.
+
+Se nenhum responder, o DS3231 segura a hora até o cadastro voltar, e o aviso
+sonoro entra depois de 30 min. Para saber de antemão o que a sua rede oferece,
+rode o [programa de teste](../teste-rede-esp32) no campus. A melhor solução
+continua sendo pedir à TI o **servidor de hora interno** e digitá-lo na página.
+
 ## Página do sino (mudar os horários)
 
 ### Como abrir
@@ -241,8 +262,9 @@ O roteiro completo, com a montagem na protoboard, está em
   certa é gravada nele exatamente na virada do segundo. Nada disso trava o
   sino, e nenhuma conferência começa a menos de 15 s de um toque.
 - **Servidores de hora:** primeiro o digitado na página, depois o informado
-  pelo DHCP da rede, depois `a.ntp.br`, `b.ntp.br` e `pool.ntp.br`. Se um falha,
-  o sino passa para o próximo.
+  pelo DHCP da rede, o **roteador**, os **servidores DNS da rede** e, por fim,
+  `a.ntp.br`, `b.ntp.br` e `pool.ntp.br`. Se um não responde, o sino passa
+  para o próximo em 1 s; quando acha um que responde, fica com ele.
 - **Precisão:** o ESP lê o DS3231 a cada 5 ms. Pela rede, a margem de cada
   conferência é metade do tempo de ida e volta até o servidor: poucos ms com
   um servidor dentro da instituição, algumas dezenas de ms com o `a.ntp.br`

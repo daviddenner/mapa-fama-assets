@@ -7,6 +7,10 @@
 //  grava a hora certa nele exatamente na virada do segundo. Quando a rede cai,
 //  o DS3231 segura a hora.
 //
+//  Servidores, em ordem: o digitado na página, o informado pelo DHCP, o
+//  roteador, os servidores DNS da rede e os da internet (config.h). Os da
+//  própria rede costumam responder mesmo sem login na página da instituição.
+//
 //  Nada aqui trava o sino: as respostas são esperadas sem parar o resto, e
 //  nenhuma conferência começa a menos de 15 s de um toque.
 // ============================================================================
@@ -18,6 +22,7 @@ const uint8_t NTP_AMOSTRAS = 4;
 uint8_t estadoNtp = NTP_PARADO;
 uint32_t ntpProximaRodadaMs = 0;
 uint8_t ntpIndice = 0;  // qual servidor da lista está sendo usado
+uint8_t ntpNumCandidatos = 0;
 char ntpNome[48] = "";
 IPAddress ntpIp;
 uint8_t ntpAmostra = 0;
@@ -51,27 +56,56 @@ void ntpConferirEMostrar() {
   ntpConferirAgora();
 }
 
-// Servidores, em ordem: o da página, o informado pelo DHCP e os do config.h.
+// Servidores, em ordem: o da página, o informado pelo DHCP, o roteador, os
+// servidores DNS da rede e os do config.h. Os da própria rede vêm primeiro
+// porque costumam responder mesmo antes do login na página da instituição
+// (o portal de login só intercepta a navegação); os da internet só respondem
+// com a internet liberada.
+const uint8_t NTP_MAX_CANDIDATOS = 8;
+
+void juntarCandidato(char lista[][48], uint8_t &n, uint8_t max, const char *nome) {
+  if (!nome[0] || n >= max) return;
+  for (uint8_t i = 0; i < n; i++)
+    if (!strcmp(lista[i], nome)) return;  // já está na lista
+  copiarTexto(lista[n++], 48, nome);
+}
+
+void juntarCandidatoIp(char lista[][48], uint8_t &n, uint8_t max, const IPAddress &ip) {
+  if (ip.isSet()) juntarCandidato(lista, n, max, ip.toString().c_str());
+}
+
 uint8_t candidatosNtp(char lista[][48], uint8_t max) {
   uint8_t n = 0;
-  if (cfg.ntpServidor[0] && n < max) copiarTexto(lista[n++], 48, cfg.ntpServidor);
-  const IPAddress dhcp = *sntp_getserver(0);
-  if (dhcp.isSet() && n < max) copiarTexto(lista[n++], 48, dhcp.toString().c_str());
+  juntarCandidato(lista, n, max, cfg.ntpServidor);
+  juntarCandidatoIp(lista, n, max, *sntp_getserver(0));
+  juntarCandidatoIp(lista, n, max, WiFi.gatewayIP());
+  juntarCandidatoIp(lista, n, max, WiFi.dnsIP(0));
+  juntarCandidatoIp(lista, n, max, WiFi.dnsIP(1));
   const char *fixos[] = {NTP_SERVIDOR_1, NTP_SERVIDOR_2, NTP_SERVIDOR_3};
-  for (uint8_t i = 0; i < 3; i++)
-    if (fixos[i][0] && n < max) copiarTexto(lista[n++], 48, fixos[i]);
+  for (uint8_t i = 0; i < 3; i++) juntarCandidato(lista, n, max, fixos[i]);
   return n;
 }
 
 void falhaNtp(const char *motivo) {
   estadoNtp = NTP_PARADO;
   snprintf(ntpUltimaFalha, sizeof ntpUltimaFalha, "%s (%s)", motivo, ntpNome[0] ? ntpNome : "-");
-  if (ntpFalhasSeguidas == 0 || ntpMostrar) Serial.printf("Rede: nao consegui conferir a hora: %s\n", ntpUltimaFalha);
+  const uint8_t n = ntpNumCandidatos;
+  if (ntpMostrar) {
+    Serial.printf("Rede: nao consegui conferir a hora: %s\n", ntpUltimaFalha);
+  } else if (n && ntpFalhasSeguidas + 1 < n) {  // primeira passada pela lista: avisa e segue
+    Serial.printf("Rede: %s; tentando o proximo servidor de hora\n", ntpUltimaFalha);
+  } else if (ntpFalhasSeguidas + 1 == (n ? n : 1)) {  // a lista inteira falhou
+    Serial.printf("Rede: nenhum servidor de hora respondeu (%s); tento de novo em 15 s\n", ntpUltimaFalha);
+  }
   ntpMostrar = false;
   if (ntpFalhasSeguidas < 255) ntpFalhasSeguidas++;
   ntpIndice++;  // da próxima vez tenta o próximo servidor
-  // as primeiras falhas passam logo para o próximo servidor; depois, de 5 em 5 min
-  ntpProximaRodadaMs = millis() + (ntpFalhasSeguidas < 5 ? 15000UL : 300000UL);
+  // Na primeira passada pela lista, passa logo ao próximo; na segunda, de 15 em
+  // 15 s; depois, de 5 em 5 min (o DS3231 segura a hora enquanto isso).
+  uint32_t espera = 300000UL;
+  if (ntpFalhasSeguidas <= n) espera = 1000UL;
+  else if (ntpFalhasSeguidas < n + 5) espera = 15000UL;
+  ntpProximaRodadaMs = millis() + espera;
 }
 
 void enviarAmostraNtp() {
@@ -93,8 +127,9 @@ void enviarAmostraNtp() {
 }
 
 void iniciarRodadaNtp() {
-  char lista[5][48];
-  const uint8_t n = candidatosNtp(lista, 5);
+  char lista[NTP_MAX_CANDIDATOS][48];
+  const uint8_t n = candidatosNtp(lista, NTP_MAX_CANDIDATOS);
+  ntpNumCandidatos = n;
   if (n == 0) {
     ntpNome[0] = 0;
     falhaNtp("nenhum servidor configurado");
@@ -176,7 +211,9 @@ void terminarRodadaNtp() {
 }
 
 void proximaAmostraNtp() {
-  if (ntpAmostra < NTP_AMOSTRAS && instConectada()) {
+  // 2 perguntas sem resposta nenhuma: servidor mudo, não vale gastar as outras
+  const bool mudo = ntpAmostra >= 2 && !ntpTemMelhor && ntpProblema == 0;
+  if (ntpAmostra < NTP_AMOSTRAS && !mudo && instConectada()) {
     enviarAmostraNtp();
   } else {
     terminarRodadaNtp();
@@ -226,6 +263,8 @@ void textoNtp(char *b, size_t tam) {
     } else {
       snprintf(b, tam, "rede da instituicao desconectada");
     }
+  } else if (ntpFalhasSeguidas && ntpFalhasSeguidas < ntpNumCandidatos && !ntpAlgumOk) {
+    snprintf(b, tam, "procurando um servidor de hora (%u de %u)", (unsigned)(ntpFalhasSeguidas + 1), (unsigned)ntpNumCandidatos);
   } else if (ntpFalhasSeguidas && ntpUltimaFalha[0]) {
     snprintf(b, tam, "falhou: %s", ntpUltimaFalha);
   } else if (ntpAlgumOk) {
