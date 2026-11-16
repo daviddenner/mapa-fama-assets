@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Gera o esquema eletrônico do sino (Eagle .sch) e uma prévia em SVG.
+"""Gera os esquemas eletrônicos do sino (Eagle .sch) e uma prévia em SVG de cada um.
 
-    python3 gerar_esquema.py            -> Sino_IFMS_v2.sch e esquema.svg nesta pasta
+    python3 gerar_esquema.py   -> nesta pasta:
+        Sino_IFMS_v2.sch    + esquema.svg        (NodeMCU v3 LoLin)
+        Sino_IFMS_ESP12.sch + esquema_esp12.svg  (ESP-12 avulso, com regulador de 3,3 V)
 
 O esquema é montado aqui, peça por peça, com uma biblioteca própria embutida
 no arquivo (não depende de bibliotecas instaladas no Eagle). Antes de gravar,
@@ -74,6 +76,9 @@ class Pacote:
     def furo(self, nome, x, y, broca=0.9, diam=1.8, forma=None):
         self.itens.append(("pad", (nome, x, y, broca, diam, forma)))
 
+    def smd(self, nome, x, y, dx, dy):
+        self.itens.append(("smd", (nome, x, y, dx, dy)))
+
     def fio(self, x1, y1, x2, y2, w=0.2032, camada=21):
         self.itens.append(("wire", (x1, y1, x2, y2, w, camada)))
 
@@ -123,6 +128,10 @@ def novo_conjunto(*a, **k):
     CONJUNTOS[c.nome] = c
     return c
 
+
+# Peças que só aparecem num dos esquemas (o resto da biblioteca vai nos dois)
+EXCLUSIVO = {"nodemcu": {"NODEMCU", "NODEMCU-V3"},
+             "esp12": {"ESP12", "ESP-12E", "AMS1117", "REGULADOR_3V3", "SOT223", "CONECTOR_SERIAL", "HDR-1X3"}}
 
 # ---------------------------------------------------------------- NodeMCU
 # Nomes como estão impressos no NodeMCU v3 (LoLin): G = GND, 3V = 3,3 V, VU = 5 V do USB
@@ -420,6 +429,68 @@ for nome in ("+5V", "+3V3"):
     s.pino(nome, 0, 0, comp="point", direcao="sup")
     novo_conjunto(nome, "P", [("1", nome, 0, 0)], "Alimentacao %s" % nome, valor_livre=False).variante("", None, {})
 
+# ------------------------------------------------- ESP-12 avulso (ESP-12E/F)
+# Pinos como no datasheet, vistos de cima com a antena para cima:
+# esquerda 1..8 de cima para baixo; direita 22..15 de cima para baixo.
+ESP_ESQ = [("RST", "1"), ("ADC", "2"), ("EN", "3"), ("GPIO16", "4"), ("GPIO14", "5"), ("GPIO12", "6"),
+           ("GPIO13", "7"), ("VCC", "8")]
+ESP_DIR = [("TXD0", "22"), ("RXD0", "21"), ("GPIO5", "20"), ("GPIO4", "19"), ("GPIO0", "18"), ("GPIO2", "17"),
+           ("GPIO15", "16"), ("GND", "15")]
+s = novo_simbolo("ESP12")
+s.caixa(-10.16, 11.43, 10.16, -11.43)
+s.texto(0, 12.7, ">NAME", camada=95, alinha="bottom-center")
+s.texto(0, -12.7, ">VALUE", camada=96, alinha="top-center")
+for i, (n, _) in enumerate(ESP_ESQ):
+    s.pino(n, -15.24, 8.89 - i * G, comp="middle", rot=0, visivel="pin")
+for i, (n, _) in enumerate(ESP_DIR):
+    s.pino(n, 15.24, 8.89 - i * G, comp="middle", rot=180, visivel="pin")
+p = novo_pacote("ESP-12E", "Modulo ESP-12E/F (16 x 24 mm), meia-furos a 2 mm. Pino 1 = RST, antena para cima. "
+                           "Medidas aproximadas: confira no datasheet antes de fazer a placa.")
+for i in range(8):
+    p.smd(str(i + 1), -7.4, 3.5 - i * 2.0, 1.8, 1.0)   # 1..8 na esquerda
+    p.smd(str(22 - i), 7.4, 3.5 - i * 2.0, 1.8, 1.0)   # 22..15 na direita
+for j in range(6):
+    p.smd(str(9 + j), -5.0 + j * 2.0, -11.4, 1.0, 1.8)  # 9..14 embaixo (memória: não ligar)
+p.caixa(-8.0, 12.0, 8.0, -12.0)
+p.fio(-8.0, 6.0, 8.0, 6.0)  # começo da antena
+p.nomes(-8.0, 13.5)
+novo_conjunto("ESP12", "U", [("G$1", "ESP12", 0, 0)], "Modulo ESP-12E/F (ESP8266) avulso").variante(
+    "", "ESP-12E", {("G$1", n): pad for n, pad in ESP_ESQ + ESP_DIR})
+
+s = novo_simbolo("REGULADOR_3V3")
+s.caixa(-5.08, 2.54, 5.08, -2.54)
+s.texto(-5.08, 3.81, ">NAME", camada=95)
+s.texto(-5.08, -5.08, ">VALUE", camada=96, alinha="top-right")
+s.pino("IN", -10.16, 0, comp="middle", rot=0, visivel="pin")
+s.pino("OUT", 10.16, 0, comp="middle", rot=180, visivel="pin")
+s.pino("GND", 0, -7.62, comp="middle", rot=90, visivel="pin")
+p = novo_pacote("SOT223", "SOT-223: 1 = GND/ADJ, 2 = saida, 3 = entrada; aba (4) = saida.")
+for i, n in enumerate(("1", "2", "3")):
+    p.smd(n, -2.3 + i * 2.3, -3.15, 1.2, 2.0)
+p.smd("4", 0, 3.15, 3.6, 2.0)
+p.caixa(-3.3, 1.8, 3.3, -1.8)
+p.nomes(-3.3, 5.0)
+novo_conjunto("AMS1117", "U", [("G$1", "REGULADOR_3V3", 0, 0)],
+              "Regulador 3,3 V AMS1117-3.3 (SOT-223), ate 1 A").variante(
+    "", "SOT223", {("G$1", "IN"): "3", ("G$1", "OUT"): "2 4", ("G$1", "GND"): "1"})
+
+s = novo_simbolo("CONECTOR_SERIAL")
+s.caixa(-2.54, 3.81, 7.62, -6.35, 0.254)
+for i, n in enumerate(["GND", "RX", "TX"]):
+    s.texto(-1.524, 1.27 - i * G, n, tam=1.27, alinha="center-left")
+s.texto(-2.54, 4.572, ">NAME", camada=95)
+s.texto(-2.54, -7.112, ">VALUE", camada=96, alinha="top-left")
+for i in range(3):
+    s.pino(str(i + 1), -7.62, 1.27 - i * G, rot=0)
+p = novo_pacote("HDR-1X3", "Barra de 3 pinos 2,54 mm para o adaptador USB-serial (GND, RX, TX do ESP)")
+for i in range(3):
+    p.furo(str(i + 1), 0, -i * G, 1.0, 1.8, "square" if i == 0 else None)
+p.caixa(-1.27, 1.27, 1.27, -6.35)
+p.nomes(2.0, 1.0)
+novo_conjunto("CONECTOR_SERIAL", "J", [("G$1", "CONECTOR_SERIAL", 0, 0)],
+              "Gravacao: adaptador USB-serial 3,3 V (TX do adaptador no RX do ESP)").variante(
+    "", "HDR-1X3", {("G$1", "1"): "1", ("G$1", "2"): "2", ("G$1", "3"): "3"})
+
 
 # ================================================================ esquema
 class Esquema:
@@ -501,138 +572,254 @@ def ramo(rede, de, ate, via=None, juncoes=(), alim=False):
     return ligar(rede, *caminho, juncoes=juncoes, alim=alim)
 
 
-# ----------------------------------------------------------------- peças
-E.peca("U1", "NODEMCU", "", "NodeMCU v3 LoLin")
-E.peca("U2", "RTC_DS3231", "", "DS3231 ZS-042")
-E.peca("K1", "RELE_5V", "", "SRD-05VDC-SL-C")
-E.peca("Q1", "BC548", "", "BC548")
-E.peca("R1", "RESISTOR", "-1/4W", "1k")
-E.peca("R2", "RESISTOR", "-1/4W", "10k")
-E.peca("R3", "RESISTOR", "-1/4W", "1k")
-E.peca("R4", "RESISTOR", "-1/2W", "100R 1/2W")
-E.peca("D1", "DIODO", "", "1N4007")
-E.peca("LED1", "LED", "", "RELE LIGADO")
-E.peca("C1", "CAP_ELETROLITICO", "", "470uF 16V")
-E.peca("C2", "CAPACITOR", "-CERAMICO", "100nF")
-E.peca("C3", "CAPACITOR", "-X2", "100nF X2 275VAC")
-E.peca("J1", "BORNE_2", "", "ENTRADA 5V")
-E.peca("J2", "BORNE_2", "", "127V FASE/SINO")
-E.peca("F1", "FUSIVEL", "", "2A")
-E.peca("S1", "BOTAO", "", "TESTE")
-E.peca("J3", "CONECTOR_GPS", "", "GPS (opcional)")
+# ------------------------------------------------- partes iguais nos dois esquemas
+def pecas_comuns():
+    E.peca("U2", "RTC_DS3231", "", "DS3231 ZS-042")
+    E.peca("K1", "RELE_5V", "", "SRD-05VDC-SL-C")
+    E.peca("Q1", "BC548", "", "BC548")
+    E.peca("R1", "RESISTOR", "-1/4W", "1k")
+    E.peca("R2", "RESISTOR", "-1/4W", "10k")
+    E.peca("R3", "RESISTOR", "-1/4W", "1k")
+    E.peca("R4", "RESISTOR", "-1/2W", "100R 1/2W")
+    E.peca("D1", "DIODO", "", "1N4007")
+    E.peca("LED1", "LED", "", "RELE LIGADO")
+    E.peca("C1", "CAP_ELETROLITICO", "", "470uF 16V")
+    E.peca("C2", "CAPACITOR", "-CERAMICO", "100nF")
+    E.peca("C3", "CAPACITOR", "-X2", "100nF X2 275VAC")
+    E.peca("J1", "BORNE_2", "", "ENTRADA 5V")
+    E.peca("J2", "BORNE_2", "", "127V FASE/SINO")
+    E.peca("F1", "FUSIVEL", "", "2A")
+    E.peca("S1", "BOTAO", "", "TESTE")
+    E.peca("J3", "CONECTOR_GPS", "", "GPS (opcional)")
 
-# ------------------------------------------------------------ posições
-E.coloca("J1", "G$1", 25.4, 160.02)
-E.coloca("C1", "G$1", 50.8, 157.48)
-E.coloca("C2", "G$1", 68.58, 157.48, 90)
-E.coloca("U1", "G$1", 104.14, 114.3)
-E.coloca("U2", "G$1", 198.12, 162.56)
-E.coloca("J3", "G$1", 198.12, 134.62)
-E.coloca("K1", "BOBINA", 236.22, 116.84)
-E.coloca("D1", "G$1", 226.06, 116.84, 90)
-E.coloca("R3", "G$1", 215.9, 124.46, 90)
-E.coloca("LED1", "G$1", 215.9, 111.76, 270)
-E.coloca("Q1", "G$1", 233.68, 96.52)
-E.coloca("R1", "G$1", 215.9, 96.52)
-E.coloca("R2", "G$1", 226.06, 86.36, 90)
-E.coloca("S1", "G$1", 172.72, 96.52)
-E.coloca("K1", "CONTATO", 233.68, 50.8)
-E.coloca("F1", "G$1", 208.28, 50.8)
-E.coloca("R4", "G$1", 228.6, 63.5)
-E.coloca("C3", "G$1", 243.84, 63.5)
-E.coloca("J2", "G$1", 172.72, 45.72)
 
-# ------------------------------------------------------------- ligações
-# Alimentação 5 V: borne, capacitores e símbolos
-x5, xg = 38.1, 35.56
-ramo("+5V", ("J1", "G$1", "1"), (x5, 170.18), via=[(x5, 162.56)])
-ligar("+5V", (x5, 170.18), (50.8, 170.18), (68.58, 170.18), (81.28, 170.18), juncoes=[(50.8, 170.18), (68.58, 170.18)],
-      alim=True)
-ramo("+5V", ("C1", "G$1", "+"), (50.8, 170.18))
-ramo("+5V", ("C2", "G$1", "2"), (68.58, 170.18))
-ramo("GND", ("J1", "G$1", "2"), (xg, 144.78), via=[(xg, 160.02)])
-ligar("GND", (xg, 144.78), (50.8, 144.78), (68.58, 144.78), (81.28, 144.78), juncoes=[(50.8, 144.78), (68.58, 144.78)],
-      alim=True)
-ramo("GND", ("C1", "G$1", "-"), (50.8, 144.78))
-ramo("GND", ("C2", "G$1", "1"), (68.58, 144.78))
+def colocar_fonte_5v():
+    E.coloca("J1", "G$1", 25.4, 160.02)
+    E.coloca("C1", "G$1", 50.8, 157.48)
+    E.coloca("C2", "G$1", 68.58, 157.48, 90)
 
-# NodeMCU: tudo por rótulos
-toco("+5V", "U1", "G$1", "VIN", "esq")
-toco("GND", "U1", "G$1", "G@3", "esq")
-toco("GND", "U1", "G$1", "G@5", "dir")
-toco("+3V3", "U1", "G$1", "3V@3", "dir")
-toco("SCL", "U1", "G$1", "D1/GPIO5", "dir")
-toco("SDA", "U1", "G$1", "D2/GPIO4", "dir")
-toco("GPS_TX", "U1", "G$1", "D5/GPIO14", "dir")
-toco("RELE", "U1", "G$1", "D6/GPIO12", "dir")
-toco("BOTAO", "U1", "G$1", "D7/GPIO13", "dir")
 
-# Relógio e GPS
-toco("SCL", "U2", "G$1", "SCL", "esq")
-toco("SDA", "U2", "G$1", "SDA", "esq")
-toco("+3V3", "U2", "G$1", "VCC", "esq")
-toco("GND", "U2", "G$1", "GND", "esq")
-toco("+5V", "J3", "G$1", "1", "esq")
-toco("GPS_TX", "J3", "G$1", "3", "esq")
-toco("GND", "J3", "G$1", "4", "esq")
+def colocar_direita():
+    E.coloca("U2", "G$1", 198.12, 162.56)
+    E.coloca("J3", "G$1", 198.12, 134.62)
+    E.coloca("K1", "BOBINA", 236.22, 116.84)
+    E.coloca("D1", "G$1", 226.06, 116.84, 90)
+    E.coloca("R3", "G$1", 215.9, 124.46, 90)
+    E.coloca("LED1", "G$1", 215.9, 111.76, 270)
+    E.coloca("Q1", "G$1", 233.68, 96.52)
+    E.coloca("R1", "G$1", 215.9, 96.52)
+    E.coloca("R2", "G$1", 226.06, 86.36, 90)
+    E.coloca("S1", "G$1", 172.72, 96.52)
+    E.coloca("K1", "CONTATO", 233.68, 50.8)
+    E.coloca("F1", "G$1", 208.28, 50.8)
+    E.coloca("R4", "G$1", 228.6, 63.5)
+    E.coloca("C3", "G$1", 243.84, 63.5)
+    E.coloca("J2", "G$1", 172.72, 45.72)
 
-# Acionamento do relé: +5V -> bobina -> coletor; diodo de roda livre; LED
-y5 = 132.08
-ramo("+5V", ("R3", "G$1", "2"), (215.9, y5))
-ligar("+5V", (215.9, y5), (226.06, y5), (236.22, y5), juncoes=[(226.06, y5)])
-ligar("+5V", (215.9, y5), (215.9, y5 + 2.54), alim=True)
-ramo("+5V", ("D1", "G$1", "C"), (226.06, y5))
-ramo("+5V", ("K1", "BOBINA", "A1"), (236.22, y5))
-yn = 104.14
-ramo("COLETOR_Q1", ("LED1", "G$1", "C"), (236.22, yn), via=[(215.9, yn), (226.06, yn)], juncoes=[(226.06, yn), (236.22, yn)])
-ramo("COLETOR_Q1", ("D1", "G$1", "A"), (226.06, yn))
-ramo("COLETOR_Q1", ("K1", "BOBINA", "A2"), (236.22, yn))
-ramo("COLETOR_Q1", ("Q1", "G$1", "C"), (236.22, yn))
-ramo("LED_ANODO", ("R3", "G$1", "1"), ("LED1", "G$1", "A"))
-ramo("BASE_Q1", ("R1", "G$1", "2"), ("Q1", "G$1", "B"), via=[(226.06, 96.52)], juncoes=[(226.06, 96.52)])
-ramo("BASE_Q1", ("R2", "G$1", "2"), (226.06, 96.52))
-ramo("GND", ("R2", "G$1", "1"), (226.06, 78.74), alim=True)
-ramo("GND", ("Q1", "G$1", "E"), (236.22, 86.36), alim=True)
-toco("RELE", "R1", "G$1", "1", "esq")
 
-# Botão de teste
-toco("BOTAO", "S1", "G$1", "1", "esq")
-ramo("GND", ("S1", "G$1", "2"), (182.88, 91.44), via=[(182.88, 96.52)], alim=True)
+def ligar_direita():
+    # Relógio e GPS
+    toco("SCL", "U2", "G$1", "SCL", "esq")
+    toco("SDA", "U2", "G$1", "SDA", "esq")
+    toco("+3V3", "U2", "G$1", "VCC", "esq")
+    toco("GND", "U2", "G$1", "GND", "esq")
+    toco("+5V", "J3", "G$1", "1", "esq")
+    toco("GPS_TX", "J3", "G$1", "3", "esq")
+    toco("GND", "J3", "G$1", "4", "esq")
 
-# Saída de 127 V: fase -> fusível -> COM; NA -> sino; snubber em paralelo
-ramo("FASE_127V", ("J2", "G$1", "1"), ("F1", "G$1", "1"), via=[(190.5, 48.26), (190.5, 50.8)])
-ramo("COM", ("F1", "G$1", "2"), (218.44, 50.8))
-ramo("COM", (218.44, 50.8), ("K1", "CONTATO", "COM"), juncoes=[(218.44, 50.8)])
-ramo("COM", (218.44, 50.8), ("R4", "G$1", "1"), via=[(218.44, 63.5)])
-ramo("SNUBBER", ("R4", "G$1", "2"), ("C3", "G$1", "1"))
-ramo("SINO", ("K1", "CONTATO", "NO"), (251.46, 53.34))
-ramo("SINO", ("C3", "G$1", "2"), (251.46, 53.34), via=[(251.46, 63.5)])
-ramo("SINO", (251.46, 53.34), ("J2", "G$1", "2"), via=[(251.46, 38.1), (182.88, 38.1), (182.88, 45.72)],
-     juncoes=[(251.46, 53.34)])
+    # Acionamento do relé: +5V -> bobina -> coletor; diodo de roda livre; LED
+    y5 = 132.08
+    ramo("+5V", ("R3", "G$1", "2"), (215.9, y5))
+    ligar("+5V", (215.9, y5), (226.06, y5), (236.22, y5), juncoes=[(226.06, y5)])
+    ligar("+5V", (215.9, y5), (215.9, y5 + 2.54), alim=True)
+    ramo("+5V", ("D1", "G$1", "C"), (226.06, y5))
+    ramo("+5V", ("K1", "BOBINA", "A1"), (236.22, y5))
+    yn = 104.14
+    ramo("COLETOR_Q1", ("LED1", "G$1", "C"), (236.22, yn), via=[(215.9, yn), (226.06, yn)],
+         juncoes=[(226.06, yn), (236.22, yn)])
+    ramo("COLETOR_Q1", ("D1", "G$1", "A"), (226.06, yn))
+    ramo("COLETOR_Q1", ("K1", "BOBINA", "A2"), (236.22, yn))
+    ramo("COLETOR_Q1", ("Q1", "G$1", "C"), (236.22, yn))
+    ramo("LED_ANODO", ("R3", "G$1", "1"), ("LED1", "G$1", "A"))
+    ramo("BASE_Q1", ("R1", "G$1", "2"), ("Q1", "G$1", "B"), via=[(226.06, 96.52)], juncoes=[(226.06, 96.52)])
+    ramo("BASE_Q1", ("R2", "G$1", "2"), (226.06, 96.52))
+    ramo("GND", ("R2", "G$1", "1"), (226.06, 78.74), alim=True)
+    ramo("GND", ("Q1", "G$1", "E"), (236.22, 86.36), alim=True)
+    toco("RELE", "R1", "G$1", "1", "esq")
 
-# ---------------------------------------------------------------- textos
-TITULOS = [
-    (12.7, 177.8, "ALIMENTACAO 5V"),
-    (73.66, 139.7, "NODEMCU V3 (LOLIN)"),
+    # Botão de teste
+    toco("BOTAO", "S1", "G$1", "1", "esq")
+    ramo("GND", ("S1", "G$1", "2"), (182.88, 91.44), via=[(182.88, 96.52)], alim=True)
+
+    # Saída de 127 V: fase -> fusível -> COM; NA -> sino; snubber em paralelo
+    ramo("FASE_127V", ("J2", "G$1", "1"), ("F1", "G$1", "1"), via=[(190.5, 48.26), (190.5, 50.8)])
+    ramo("COM", ("F1", "G$1", "2"), (218.44, 50.8))
+    ramo("COM", (218.44, 50.8), ("K1", "CONTATO", "COM"), juncoes=[(218.44, 50.8)])
+    ramo("COM", (218.44, 50.8), ("R4", "G$1", "1"), via=[(218.44, 63.5)])
+    ramo("SNUBBER", ("R4", "G$1", "2"), ("C3", "G$1", "1"))
+    ramo("SINO", ("K1", "CONTATO", "NO"), (251.46, 53.34))
+    ramo("SINO", ("C3", "G$1", "2"), (251.46, 53.34), via=[(251.46, 63.5)])
+    ramo("SINO", (251.46, 53.34), ("J2", "G$1", "2"), via=[(251.46, 38.1), (182.88, 38.1), (182.88, 45.72)],
+         juncoes=[(251.46, 53.34)])
+
+
+TITULOS_DIREITA = [
     (182.88, 175.26, "RELOGIO DS3231 - LADO DE 4 PINOS"),
     (182.88, 147.32, "GPS (OPCIONAL)"),
     (213.36, 142.24, "ACIONAMENTO DO RELE"),
     (160.02, 106.68, "BOTAO DE TESTE"),
     (167.64, 71.12, "SAIDA 127V PARA O SINO"),
 ]
-NOTAS = [
-    "NOTAS",
-    "1. Fonte 5V (ex.: HLK-PM01) em J1: alimenta o rele e o NodeMCU pelo pino VIN.",
-    "2. O 3V do NodeMCU alimenta o RTC (bateria CR2032). VU = 5V do USB: nao ligar.",
-    "3. Q1 liga o rele com D6/GPIO12 em nivel ALTO: no firmware, RELE_ATIVO_EM_BAIXO = false.",
-    "4. R2 mantem o rele desligado enquanto o ESP liga ou e gravado.",
-    "5. D1 = diodo de roda livre (catodo no +5V). Rele com mais de 90 mA: troque Q1 por BC337.",
-    "6. RTC: lado de 4 pinos do ZS-042, na ordem impressa no modulo: SCL, SDA, VCC, GND.",
-    "7. Hora certa pela rede (NTP); o DS3231 segura a hora quando a rede cai. J3 (GPS) e opcional.",
-    "8. 127V: fase -> J2.1 -> F1 -> COM; NA -> J2.2 -> sino; neutro direto no sino.",
-    "9. Snubber R4+C3 opcional (protege o contato e evita reset do ESP).",
-    "10. Na placa: deixar 6 mm ou mais entre a parte de 127V e o resto do circuito.",
-]
+
+
+# -------------------------------------------------- esquema 1: NodeMCU v3 LoLin
+def esquema_nodemcu():
+    E.peca("U1", "NODEMCU", "", "NodeMCU v3 LoLin")
+    pecas_comuns()
+    colocar_fonte_5v()
+    E.coloca("U1", "G$1", 104.14, 114.3)
+    colocar_direita()
+
+    # Alimentação 5 V: borne, capacitores e símbolos
+    x5, xg = 38.1, 35.56
+    ramo("+5V", ("J1", "G$1", "1"), (x5, 170.18), via=[(x5, 162.56)])
+    ligar("+5V", (x5, 170.18), (50.8, 170.18), (68.58, 170.18), (81.28, 170.18),
+          juncoes=[(50.8, 170.18), (68.58, 170.18)], alim=True)
+    ramo("+5V", ("C1", "G$1", "+"), (50.8, 170.18))
+    ramo("+5V", ("C2", "G$1", "2"), (68.58, 170.18))
+    ramo("GND", ("J1", "G$1", "2"), (xg, 144.78), via=[(xg, 160.02)])
+    ligar("GND", (xg, 144.78), (50.8, 144.78), (68.58, 144.78), (81.28, 144.78),
+          juncoes=[(50.8, 144.78), (68.58, 144.78)], alim=True)
+    ramo("GND", ("C1", "G$1", "-"), (50.8, 144.78))
+    ramo("GND", ("C2", "G$1", "1"), (68.58, 144.78))
+
+    # NodeMCU: tudo por rótulos
+    toco("+5V", "U1", "G$1", "VIN", "esq")
+    toco("GND", "U1", "G$1", "G@3", "esq")
+    toco("GND", "U1", "G$1", "G@5", "dir")
+    toco("+3V3", "U1", "G$1", "3V@3", "dir")
+    toco("SCL", "U1", "G$1", "D1/GPIO5", "dir")
+    toco("SDA", "U1", "G$1", "D2/GPIO4", "dir")
+    toco("GPS_TX", "U1", "G$1", "D5/GPIO14", "dir")
+    toco("RELE", "U1", "G$1", "D6/GPIO12", "dir")
+    toco("BOTAO", "U1", "G$1", "D7/GPIO13", "dir")
+    ligar_direita()
+
+    titulos = [(12.7, 177.8, "ALIMENTACAO 5V"), (73.66, 139.7, "NODEMCU V3 (LOLIN)")] + TITULOS_DIREITA
+    notas = [
+        "NOTAS",
+        "1. Fonte 5V (ex.: HLK-PM01) em J1: alimenta o rele e o NodeMCU pelo pino VIN.",
+        "2. O 3V do NodeMCU alimenta o RTC (bateria CR2032). VU = 5V do USB: nao ligar.",
+        "3. Q1 liga o rele com D6/GPIO12 em nivel ALTO: no firmware, RELE_ATIVO_EM_BAIXO = false.",
+        "4. R2 mantem o rele desligado enquanto o ESP liga ou e gravado.",
+        "5. D1 = diodo de roda livre (catodo no +5V). Rele com mais de 90 mA: troque Q1 por BC337.",
+        "6. RTC: lado de 4 pinos do ZS-042, na ordem impressa no modulo: SCL, SDA, VCC, GND.",
+        "7. Hora certa pela rede (NTP); o DS3231 segura a hora quando a rede cai. J3 (GPS) e opcional.",
+        "8. 127V: fase -> J2.1 -> F1 -> COM; NA -> J2.2 -> sino; neutro direto no sino.",
+        "9. Snubber R4+C3 opcional (protege o contato e evita reset do ESP).",
+        "10. Na placa: deixar 6 mm ou mais entre a parte de 127V e o resto do circuito.",
+    ]
+    rodape = ("NodeMCU v3 + DS3231 + rele 5V   Rev. 3   2026-11-13", "Firmware: sino-gps/sino_gps")
+    return titulos, notas, rodape
+
+
+# ------------------------------------------- esquema 2: ESP-12 avulso (sem placa)
+def esquema_esp12():
+    E.peca("U1", "ESP12", "", "ESP-12E/F")
+    pecas_comuns()
+    E.peca("U3", "AMS1117", "", "AMS1117-3.3")
+    E.peca("C4", "CAP_ELETROLITICO", "", "100uF 10V")
+    E.peca("C5", "CAPACITOR", "-CERAMICO", "100nF")
+    for nome in ("R5", "R6", "R7", "R8", "R9"):
+        E.peca(nome, "RESISTOR", "-1/4W", "10k")
+    E.peca("S2", "BOTAO", "", "RESET")
+    E.peca("S3", "BOTAO", "", "FLASH")
+    E.peca("J4", "CONECTOR_SERIAL", "", "USB-SERIAL 3,3V")
+
+    colocar_fonte_5v()
+    E.coloca("U3", "G$1", 101.6, 170.18)
+    E.coloca("C4", "G$1", 119.38, 157.48)
+    E.coloca("C5", "G$1", 139.7, 157.48, 90)
+    E.coloca("U1", "G$1", 111.76, 109.22)
+    for i, nome in enumerate(("R5", "R6", "R7", "R8", "R9")):
+        E.coloca(nome, "G$1", 50.8, 124.46 - i * 7.62)
+    E.coloca("S2", "G$1", 35.56, 81.28)
+    E.coloca("S3", "G$1", 81.28, 81.28)
+    E.coloca("J4", "G$1", 160.02, 129.54)
+    colocar_direita()
+
+    # Alimentação: 5 V da fonte (relé) -> AMS1117 -> 3,3 V (ESP-12 e relógio)
+    x5, xg = 38.1, 35.56
+    ramo("+5V", ("J1", "G$1", "1"), (x5, 170.18), via=[(x5, 162.56)])
+    ligar("+5V", (x5, 170.18), (50.8, 170.18), (68.58, 170.18), (81.28, 170.18), ("U3", "G$1", "IN"),
+          juncoes=[(50.8, 170.18), (68.58, 170.18), (81.28, 170.18)])
+    ligar("+5V", (81.28, 170.18), (81.28, 172.72), alim=True)
+    ramo("+5V", ("C1", "G$1", "+"), (50.8, 170.18))
+    ramo("+5V", ("C2", "G$1", "2"), (68.58, 170.18))
+    ligar("+3V3", ("U3", "G$1", "OUT"), (119.38, 170.18), (139.7, 170.18), (147.32, 170.18),
+          juncoes=[(119.38, 170.18), (139.7, 170.18)], alim=True)
+    ramo("+3V3", ("C4", "G$1", "+"), (119.38, 170.18))
+    ramo("+3V3", ("C5", "G$1", "2"), (139.7, 170.18))
+    ramo("GND", ("J1", "G$1", "2"), (xg, 144.78), via=[(xg, 160.02)])
+    ligar("GND", (xg, 144.78), (50.8, 144.78), (68.58, 144.78), (101.6, 144.78), (119.38, 144.78),
+          (139.7, 144.78), (147.32, 144.78),
+          juncoes=[(50.8, 144.78), (68.58, 144.78), (101.6, 144.78), (119.38, 144.78), (139.7, 144.78)], alim=True)
+    ramo("GND", ("C1", "G$1", "-"), (50.8, 144.78))
+    ramo("GND", ("C2", "G$1", "1"), (68.58, 144.78))
+    ramo("GND", ("U3", "G$1", "GND"), (101.6, 144.78))
+    ramo("GND", ("C4", "G$1", "-"), (119.38, 144.78))
+    ramo("GND", ("C5", "G$1", "1"), (139.7, 144.78))
+
+    # ESP-12: tudo por rótulos (ADC e GPIO16 ficam sem ligar)
+    toco("RST", "U1", "G$1", "RST", "esq")
+    toco("EN", "U1", "G$1", "EN", "esq")
+    toco("GPS_TX", "U1", "G$1", "GPIO14", "esq")
+    toco("RELE", "U1", "G$1", "GPIO12", "esq")
+    toco("BOTAO", "U1", "G$1", "GPIO13", "esq")
+    toco("+3V3", "U1", "G$1", "VCC", "esq")
+    toco("TXD0", "U1", "G$1", "TXD0", "dir")
+    toco("RXD0", "U1", "G$1", "RXD0", "dir")
+    toco("SCL", "U1", "G$1", "GPIO5", "dir")
+    toco("SDA", "U1", "G$1", "GPIO4", "dir")
+    toco("GPIO0", "U1", "G$1", "GPIO0", "dir")
+    toco("GPIO2", "U1", "G$1", "GPIO2", "dir")
+    toco("GPIO15", "U1", "G$1", "GPIO15", "dir")
+    toco("GND", "U1", "G$1", "GND", "dir")
+
+    # Resistores de partida e botões RESET/FLASH
+    for nome, de, para in (("R5", "+3V3", "EN"), ("R6", "+3V3", "RST"), ("R7", "+3V3", "GPIO0"),
+                           ("R8", "+3V3", "GPIO2"), ("R9", "GPIO15", "GND")):
+        toco(de, nome, "G$1", "1", "esq")
+        toco(para, nome, "G$1", "2", "dir")
+    toco("RST", "S2", "G$1", "1", "esq")
+    toco("GND", "S2", "G$1", "2", "dir")
+    toco("GPIO0", "S3", "G$1", "1", "esq")
+    toco("GND", "S3", "G$1", "2", "dir")
+
+    # Gravação: adaptador USB-serial de 3,3 V
+    toco("GND", "J4", "G$1", "1", "esq")
+    toco("RXD0", "J4", "G$1", "2", "esq")
+    toco("TXD0", "J4", "G$1", "3", "esq")
+    ligar_direita()
+
+    titulos = [(12.7, 177.8, "ALIMENTACAO 5V E 3,3V"), (88.9, 127.0, "ESP-12 (ESP8266)"),
+               (27.94, 132.08, "RESISTORES DE PARTIDA (BOOT)"), (17.78, 87.63, "BOTOES RESET E FLASH"),
+               (144.78, 137.16, "GRAVACAO (USB-SERIAL)")] + TITULOS_DIREITA
+    notas = [
+        "NOTAS",
+        "1. 5V em J1 (USB ou carregador na protoboard; HLK-PM01 na placa): rele e regulador U3.",
+        "2. U3 (AMS1117-3.3) da os 3,3V do ESP-12 e do RTC. O ESP-12 so aceita 3,3V: nunca ligue 5V nele.",
+        "3. Partida: EN, RST, GPIO0 e GPIO2 em 3,3V (10k); GPIO15 no GND (10k). ADC e GPIO16: nao ligar.",
+        "4. Gravar: adaptador USB-serial 3,3V em J4 (TX dele no RX). Segure FLASH, aperte RESET, solte FLASH.",
+        "5. Q1 liga o rele com GPIO12 em nivel ALTO: RELE_ATIVO_EM_BAIXO = false. R2 segura o rele no boot.",
+        "6. D1 = diodo de roda livre (catodo no +5V). O LED azul do proprio ESP-12 fica no GPIO2.",
+        "7. RTC: SCL no GPIO5, SDA no GPIO4 (alguns modulos trocam 4 e 5 na serigrafia).",
+        "8. 127V: fase -> J2.1 -> F1 -> COM; NA -> J2.2 -> sino; neutro direto. Snubber R4+C3 opcional.",
+        "9. Na placa: deixar 6 mm ou mais entre a parte de 127V e o resto do circuito.",
+    ]
+    rodape = ("ESP-12 + DS3231 + rele 5V   Rev. 1   2026-11-16",
+              "Firmware: sino-gps/sino_gps; teste: teste-rede/teste_rede")
+    return titulos, notas, rodape
 
 
 # ================================================================ conferência
@@ -742,7 +929,11 @@ def a(**k):
                     for n, v in k.items() if v is not None)
 
 
-def xml_esquema():
+def xml_esquema(variante):
+    fora = set()
+    for nome, itens in EXCLUSIVO.items():
+        if nome != variante:
+            fora |= itens
     L = ['<?xml version="1.0" encoding="utf-8"?>', '<!DOCTYPE eagle SYSTEM "eagle.dtd">', '<eagle version="7.7.0">',
          "<drawing>", "<settings>", '<setting alwaysvectorfont="no"/>', '<setting verticaltext="up"/>', "</settings>",
          '<grid distance="0.1" unitdist="inch" unit="inch" style="lines" multiple="1" display="no" '
@@ -754,6 +945,8 @@ def xml_esquema():
           "<libraries>", '<library name="sino_ifms">',
           "<description>Biblioteca do projeto Sino IFMS (gerada automaticamente).</description>", "<packages>"]
     for p in PACOTES.values():
+        if p.nome in fora:
+            continue
         L.append('<package name="%s">' % escape(p.nome))
         if p.descricao:
             L.append("<description>%s</description>" % escape(p.descricao))
@@ -761,6 +954,9 @@ def xml_esquema():
             if tipo == "pad":
                 nome, x, y, broca, diam, forma = d
                 L.append("<pad %s/>" % a(name=nome, x=f(x), y=f(y), drill=f(broca), diameter=f(diam), shape=forma))
+            elif tipo == "smd":
+                nome, x, y, dx, dy = d
+                L.append("<smd %s/>" % a(name=nome, x=f(x), y=f(y), dx=f(dx), dy=f(dy), layer=1))
             elif tipo == "wire":
                 x1, y1, x2, y2, w, cam = d
                 L.append("<wire %s/>" % a(x1=f(x1), y1=f(y1), x2=f(x2), y2=f(y2), width=f(w), layer=cam))
@@ -773,6 +969,8 @@ def xml_esquema():
         L.append("</package>")
     L += ["</packages>", "<symbols>"]
     for s in SIMBOLOS.values():
+        if s.nome in fora:
+            continue
         L.append('<symbol name="%s">' % escape(s.nome))
         for tipo, d in s.itens:
             if tipo == "wire":
@@ -796,6 +994,8 @@ def xml_esquema():
         L.append("</symbol>")
     L += ["</symbols>", "<devicesets>"]
     for c in CONJUNTOS.values():
+        if c.nome in fora:
+            continue
         L.append('<deviceset %s>' % a(name=c.nome, prefix=c.prefixo, uservalue="yes" if c.valor_livre else None))
         L.append("<description>%s</description>" % escape(c.descricao))
         L.append("<gates>")
@@ -855,20 +1055,20 @@ def xml_esquema():
     return "\n".join(L) + "\n"
 
 
-def montar_plano():
+def montar_plano(titulos, notas, rodape):
     for (a1, b1, a2, b2) in ((0, 0, 279.4, 0), (279.4, 0, 279.4, 190.5), (279.4, 190.5, 0, 190.5), (0, 190.5, 0, 0)):
         E.plano.append(("wire", (a1, b1, a2, b2, 0.4064, 94)))
-    for x, y, t in TITULOS:
+    for x, y, t in titulos:
         E.plano.append(("text", (x, y, t, 2.1844, 97)))
-    for i, linha in enumerate(NOTAS):
+    for i, linha in enumerate(notas):
         E.plano.append(("text", (7.62, 72.39 - i * 3.81, linha, 1.778 if i else 2.1844, 97)))
     # quadro de título
     x0, x1, y0, y1 = 182.88, 279.4, 0, 22.86  # encosta na borda de baixo e da direita
     for (a1, b1, a2, b2) in ((x0, y1, x1, y1), (x0, y0, x0, y1), (x0, 12.7, x1, 12.7)):
         E.plano.append(("wire", (a1, b1, a2, b2, 0.254, 94)))
     E.plano.append(("text", (185.42, 16.51, "SINO IFMS - CONTROLADOR DO SINO", 2.54, 94)))
-    E.plano.append(("text", (185.42, 6.35, "NodeMCU v3 + DS3231 + rele 5V   Rev. 3   2026-11-13", 1.778, 94)))
-    E.plano.append(("text", (185.42, 2.54, "Firmware: sino-gps/sino_gps", 1.778, 94)))
+    E.plano.append(("text", (185.42, 6.35, rodape[0], 1.778, 94)))
+    E.plano.append(("text", (185.42, 2.54, rodape[1], 1.778, 94)))
 
 
 # ===================================================================== SVG
@@ -1019,7 +1219,8 @@ def validar_xml(xml_texto):
     raiz = ET.fromstring(xml_texto.split("\n", 2)[2])
     sch = raiz.find("drawing/schematic")
     lib = sch.find("libraries/library")
-    pacotes = {p.get("name"): {pad.get("name") for pad in p.iter("pad")} for p in lib.find("packages")}
+    pacotes = {p.get("name"): {pad.get("name") for pad in p.iter("pad")} | {sm.get("name") for sm in p.iter("smd")}
+               for p in lib.find("packages")}
     simbolos = {s.get("name"): {pin.get("name") for pin in s.iter("pin")} for s in lib.find("symbols")}
     conjuntos = {}
     for ds in lib.find("devicesets"):
@@ -1083,29 +1284,38 @@ def validar_xml(xml_texto):
     return erros, len(vistos)
 
 
+VARIANTES = [
+    ("nodemcu", esquema_nodemcu, "Sino_IFMS_v2.sch", "esquema.svg"),
+    ("esp12", esquema_esp12, "Sino_IFMS_ESP12.sch", "esquema_esp12.svg"),
+]
+
+
 def main():
+    global E
     aqui = os.path.dirname(os.path.abspath(__file__))
-    montar_plano()
-    erros = conferir()
-    if erros:
-        print("ERROS:")
-        for e in erros:
-            print("  " + e)
-        sys.exit(1)
-    xml = xml_esquema()
-    erros, n_pinos = validar_xml(xml)
-    if erros:
-        print("ERROS NO ARQUIVO:")
-        for e in erros:
-            print("  " + e)
-        sys.exit(1)
-    with open(os.path.join(aqui, "Sino_IFMS_v2.sch"), "w", encoding="utf-8") as arq:
-        arq.write(xml)
-    with open(os.path.join(aqui, "esquema.svg"), "w", encoding="utf-8") as arq:
-        arq.write(svg_esquema(xml))
-    n_lig = sum(1 for r in E.redes)
-    print("OK: %d pecas, %d redes, %d pinos ligados, %d simbolos -> Sino_IFMS_v2.sch e esquema.svg" %
-          (len([p for p in E.pecas if not p.startswith(("GND", "P"))]), n_lig, n_pinos, len(SIMBOLOS)))
+    for variante, montar, arq_sch, arq_svg in VARIANTES:
+        E = Esquema()
+        montar_plano(*montar())
+        erros = conferir()
+        if erros:
+            print("ERROS (%s):" % variante)
+            for e in erros:
+                print("  " + e)
+            sys.exit(1)
+        xml = xml_esquema(variante)
+        erros, n_pinos = validar_xml(xml)
+        if erros:
+            print("ERROS NO ARQUIVO (%s):" % variante)
+            for e in erros:
+                print("  " + e)
+            sys.exit(1)
+        with open(os.path.join(aqui, arq_sch), "w", encoding="utf-8") as arq:
+            arq.write(xml)
+        with open(os.path.join(aqui, arq_svg), "w", encoding="utf-8") as arq:
+            arq.write(svg_esquema(xml))
+        n_sim = xml.count("<symbol name=")
+        print("OK: %d pecas, %d redes, %d pinos ligados, %d simbolos -> %s e %s" %
+              (len([p for p in E.pecas if not p.startswith(("GND", "P"))]), len(E.redes), n_pinos, n_sim, arq_sch, arq_svg))
 
 
 if __name__ == "__main__":

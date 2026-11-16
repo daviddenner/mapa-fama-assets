@@ -1,4 +1,4 @@
-// Testes das funções de análise do teste de rede. Rodam no PC, sem ESP32:
+// Testes das funções de análise do teste de rede. Rodam no PC, sem placa:
 //   g++ -std=c++17 -Wall -I../teste_rede teste_analise.cpp -o teste && ./teste
 #include <cstdio>
 #include <cstdlib>
@@ -146,6 +146,8 @@ int main() {
   CHECA(strstr(motivoQueda(202), "MAC") && strstr(motivoQueda(15), "SENHA"));
   CHECA(strstr(motivoQueda(201), "nao encontrada") && strcmp(motivoQueda(999), "outro motivo") == 0);
   CHECA(!strcmp(nomeSeguranca(0), "aberta") && strstr(nomeSeguranca(5), "Enterprise"));
+  CHECA(!strcmp(nomeSeguranca8266(7), "aberta") && !strcmp(nomeSeguranca8266(4), "WPA2") &&
+        strstr(nomeSeguranca8266(255), "Enterprise"));
 
   // ------------------------------------------------- ICMP timestamp e TIME
   uint8_t pk[20];

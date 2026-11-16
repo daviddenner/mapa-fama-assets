@@ -6,7 +6,7 @@ on:
   push:
     paths:
       - "sino-gps/**"
-      - "teste-rede-esp32/**"
+      - "teste-rede/**"
       - "hardware/**"
       - ".github/workflows/compilar.yml"
   workflow_dispatch:
@@ -28,18 +28,18 @@ jobs:
       - name: Sino GPS (hora pela rede)
         run: cd sino-gps/testes && g++ -std=c++17 -Wall -Wextra -I../sino_gps teste_ntp.cpp -o teste_ntp && ./teste_ntp
       - name: Teste de rede
-        run: cd teste-rede-esp32/testes && g++ -std=c++17 -Wall -Wextra -I../teste_rede teste_analise.cpp -o teste && ./teste
+        run: cd teste-rede/testes && g++ -std=c++17 -Wall -Wextra -I../teste_rede teste_analise.cpp -o teste && ./teste
 
   esquema:
     name: Esquema (Eagle)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Gerar e conferir o esquema
+      - name: Gerar e conferir os esquemas
         run: |
           cd hardware
           python3 gerar_esquema.py
-          git diff --exit-code -- Sino_IFMS_v2.sch esquema.svg
+          git diff --exit-code -- Sino_IFMS_v2.sch esquema.svg Sino_IFMS_ESP12.sch esquema_esp12.svg
 
   sino-esp8266:
     name: Sino GPS (ESP8266)
@@ -55,6 +55,21 @@ jobs:
         run: arduino-cli compile --fqbn esp8266:esp8266:generic --warnings default sino-gps/sino_gps
       - name: Compilar (NodeMCU 1.0, a placa indicada no README)
         run: arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 --warnings default sino-gps/sino_gps
+
+  teste-rede-esp8266:
+    name: Teste de rede (ESP-12 / ESP8266)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Instalar pacote ESP8266
+        run: |
+          arduino-cli core update-index --additional-urls "$URL_ESP8266"
+          arduino-cli core install esp8266:esp8266 --additional-urls "$URL_ESP8266"
+      - name: Compilar (ESP-12 avulso, Generic ESP8266 Module 4MB)
+        run: arduino-cli compile --fqbn esp8266:esp8266:generic:eesz=4M2M --warnings default teste-rede/teste_rede
+      - name: Compilar (NodeMCU 1.0)
+        run: arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 --warnings default teste-rede/teste_rede
 
   teste-rede-esp32:
     name: Teste de rede (${{ matrix.placa.nome }}, pacote ${{ matrix.versao }})
@@ -76,4 +91,4 @@ jobs:
           arduino-cli core install "$NUCLEO" --additional-urls "$URL_ESP32"
           arduino-cli core list
       - name: Compilar
-        run: arduino-cli compile --fqbn "${{ matrix.placa.fqbn }}" --warnings default teste-rede-esp32/teste_rede
+        run: arduino-cli compile --fqbn "${{ matrix.placa.fqbn }}" --warnings default teste-rede/teste_rede

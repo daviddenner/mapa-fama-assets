@@ -69,7 +69,9 @@ saída de 127 V) está em [`../hardware`](../hardware). Resumo:
 | GPS (opcional) | RX | não ligar |
 
 Com o NodeMCU, os resistores de boot já estão na placa. Com um ESP-12 avulso:
-EN, RST, GPIO0 e GPIO2 em 3,3 V (10 kΩ) e GPIO15 em GND (10 kΩ). O LED azul do
+EN, RST, GPIO0 e GPIO2 em 3,3 V (10 kΩ), GPIO15 em GND (10 kΩ) e um regulador
+de 3,3 V. O esquema completo dessa versão é o
+[`../hardware/esquema_esp12.png`](../hardware/esquema_esp12.png). O LED azul do
 próprio ESP-12 (GPIO2, D4) mostra o estado do sino.
 
 > **DS3231 (ZS-042):** alimente com **3,3 V**. Esse módulo tem um circuito que
@@ -99,8 +101,11 @@ próprio ESP-12 (GPIO2, D4) mostra o estado do sino.
    {11, 30, SEG_A_SEX, 2500, 1}, // fim do período, 2,5 s
    {8, 0, SAB, 1500, 1},         // só sábado
    ```
-4. Placa: **NodeMCU 1.0 (ESP-12E Module)** (ou Generic ESP8266 Module com um
-   ESP-12 avulso). Grave. Não precisa de nenhuma biblioteca além do pacote ESP8266.
+4. Placa: **NodeMCU 1.0 (ESP-12E Module)**. Com um ESP-12 avulso: **Generic
+   ESP8266 Module**, Flash Size 4MB, Reset Method "no dtr (aka ck)", e grave
+   segurando o botão FLASH (veja
+   [`../hardware/PROTOBOARD_ESP12.md`](../hardware/PROTOBOARD_ESP12.md)). Não
+   precisa de nenhuma biblioteca além do pacote ESP8266.
 5. Na página do sino, em "Rede e senhas", digite o nome e a senha da rede da
    instituição. Se a TI indicar um servidor de hora interno, digite em
    "Servidor de hora"; sem ele, o sino usa o informado pelo DHCP e o `a.ntp.br`.
@@ -139,7 +144,8 @@ passa a importar só para abrir a página pela rede da instituição.
 
 Se nenhum responder, o DS3231 segura a hora até o cadastro voltar, e o aviso
 sonoro entra depois de 30 min. Para saber de antemão o que a sua rede oferece,
-rode o [programa de teste](../teste-rede-esp32) no campus. A melhor solução
+rode o [programa de teste](../teste-rede) no campus (no próprio ESP-12 do
+sino, com o relé e o relógio ligados). A melhor solução
 continua sendo pedir à TI o **servidor de hora interno** e digitá-lo na página.
 
 ## Página do sino (mudar os horários)

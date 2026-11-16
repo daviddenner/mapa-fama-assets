@@ -1,13 +1,23 @@
 # Esquema eletrônico do sino (Eagle)
 
-![Esquema do controlador do sino](esquema.png)
+Há dois esquemas, um para cada jeito de montar o ESP-12:
+
+| Versão | Esquema (Eagle) | Prévia | Protoboard |
+|---|---|---|---|
+| **NodeMCU v3 LoLin** (ESP-12 numa placa com USB) | `Sino_IFMS_v2.sch` | [`esquema.png`](esquema.png) | [`PROTOBOARD.md`](PROTOBOARD.md) |
+| **ESP-12 avulso** (com regulador de 3,3 V, resistores de partida, botões RESET/FLASH e conector de gravação) | `Sino_IFMS_ESP12.sch` | [`esquema_esp12.png`](esquema_esp12.png) | [`PROTOBOARD_ESP12.md`](PROTOBOARD_ESP12.md) |
+
+Nos dois, o relé, o relógio, o botão de teste e a saída de 127 V são iguais e
+usam os mesmos GPIOs, então o mesmo firmware serve para os dois.
+
+![Esquema com NodeMCU](esquema.png)
 
 | Arquivo | O que é |
 |---|---|
-| `Sino_IFMS_v2.sch` | esquema para o **Eagle** (7.7 ou mais novo). A biblioteca das peças vai junto, dentro do arquivo |
-| `esquema.png` / `esquema.svg` | prévia do mesmo esquema |
-| `gerar_esquema.py` | script que gera os três arquivos acima (`python3 gerar_esquema.py`) |
-| [`PROTOBOARD.md`](PROTOBOARD.md) | **montagem e roteiro de teste na protoboard** (faça antes da placa) |
+| `Sino_IFMS_v2.sch`, `Sino_IFMS_ESP12.sch` | esquemas para o **Eagle** (7.7 ou mais novo). A biblioteca das peças vai junto, dentro de cada arquivo |
+| `esquema.png`/`.svg`, `esquema_esp12.png`/`.svg` | prévias dos esquemas |
+| `gerar_esquema.py` | script que gera os arquivos acima (`python3 gerar_esquema.py`) |
+| [`PROTOBOARD.md`](PROTOBOARD.md), [`PROTOBOARD_ESP12.md`](PROTOBOARD_ESP12.md) | **montagem e roteiro de teste na protoboard** (faça antes da placa) |
 
 Para abrir: copie `Sino_IFMS_v2.sch` para a pasta do projeto no Eagle
 (`Documentos\EAGLE\Sino_IFMS`) e abra pelo Eagle. O nome tem `_v2` de propósito,
@@ -43,6 +53,24 @@ para não sobrescrever o esquema que já existe lá. Para desenhar a placa, use
 > **Importante no firmware:** com o BC548 o relé liga quando D6 vai a 3,3 V,
 > então `RELE_ATIVO_EM_BAIXO` tem que ser **`false`** (já está assim no
 > `config.h`). Se ficar `true`, o sino toca sem parar.
+
+## Versão com ESP-12 avulso
+
+![Esquema com ESP-12 avulso](esquema_esp12.png)
+
+O que muda em relação ao NodeMCU:
+
+| Bloco | Como funciona |
+|---|---|
+| **U3 (AMS1117-3.3)** | tira 3,3 V dos 5 V da fonte para o ESP-12 e o relógio. C4 (100 µF) e C5 (100 nF) seguram os picos do Wi-Fi |
+| **R5 a R9 (10 kΩ)** | partida do ESP-12: EN, RST, GPIO0 e GPIO2 em 3,3 V; GPIO15 no GND |
+| **S2 (RESET) e S3 (FLASH)** | para gravar: segure FLASH, aperte RESET, solte FLASH |
+| **J4** | adaptador USB-serial de 3,3 V: GND, RX e TX do ESP (TX do adaptador no RX do ESP) |
+
+Peças a mais na lista de material: ESP-12E/F (em vez do NodeMCU), AMS1117-3.3
+(SOT-223), capacitor eletrolítico 100 µF 10 V, capacitor cerâmico 100 nF,
+5 resistores de 10 kΩ, 2 botões táteis e uma barra de 3 pinos. O desenho do
+ESP-12 na placa tem medidas aproximadas: confira no datasheet antes de furar.
 
 ## Gerenciamento local
 

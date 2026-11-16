@@ -1,31 +1,20 @@
 // ============================================================================
 //  Página pelo Wi-Fi do próprio ESP, fila de comandos, relatórios guardados
-//  na memória, LED e botão. Com isto o teste roda sem computador: só com o
+//  na memória, LED e botões. Com isto o teste roda sem computador: só com o
 //  celular (ou nem isso: botão + LED).
+//
+//  Tudo roda no mesmo laço: durante um teste, as esperas chamam pausa(), que
+//  continua atendendo a página, o LED, os botões e o monitor serial.
 // ============================================================================
-#include <LittleFS.h>
-
 bool fsOk = false;
 
 // ------------------------------------------------------------ fila de comandos
-// Os comandos (do monitor serial, da página ou do botão) rodam numa tarefa
-// separada, para a página continuar respondendo durante um teste.
-void tarefaComandos(void *) {
-  static char linha[160];
-  for (;;) {
-    if (xQueueReceive(filaCmd, linha, portMAX_DELAY) == pdTRUE) {
-      ocupado = true;
-      pararPedido = false;
-      executar(linha);
-      ocupado = false;
-    }
-  }
-}
+const uint8_t FILA_CMD = 6;
+char filaCmd[FILA_CMD][160];
+uint8_t cmdIni = 0, cmdQtd = 0;
 
 void enfileirar(const char *c) {
-  char l[160];
-  snprintf(l, sizeof l, "%s", c);
-  if (!strcasecmp(l, "parar")) {  // vale na hora, sem esperar a fila
+  if (!strcasecmp(c, "parar")) {  // vale na hora, sem esperar a fila
     if (ocupado) {
       pararPedido = true;
       saida.println("> parar  (o que estiver rodando termina o passo atual e para)");
@@ -34,50 +23,91 @@ void enfileirar(const char *c) {
     }
     return;
   }
-  if (xQueueSend(filaCmd, l, 0) != pdTRUE) saida.println("(muitos comandos na fila; espere terminar)");
+  if (cmdQtd >= FILA_CMD) {
+    saida.println("(muitos comandos na fila; espere terminar)");
+    return;
+  }
+  snprintf(filaCmd[(cmdIni + cmdQtd) % FILA_CMD], sizeof filaCmd[0], "%s", c);
+  cmdQtd++;
+  if (ocupado) saida.printf("(comando '%s' na fila: roda quando o atual terminar)\n", c);
+}
+
+bool tirarDaFila(char *dst, size_t tam) {
+  if (!cmdQtd) return false;
+  snprintf(dst, tam, "%s", filaCmd[cmdIni]);
+  cmdIni = (cmdIni + 1) % FILA_CMD;
+  cmdQtd--;
+  return true;
+}
+
+// Página, LED, botões e monitor serial. Chamado no laço e durante as esperas.
+void servicoFundo() {
+  static bool dentro = false;
+  if (dentro) return;  // sem reentrada
+  dentro = true;
+  lerSerial();
+  servidor.handleClient();
+  atualizarLed();
+  atualizarBotoes();
+  dentro = false;
+}
+
+// Espera 'ms' sem deixar a página, o LED e os botões parados.
+void pausa(uint32_t ms) {
+  const uint32_t inicio = millis();
+  do {
+    servicoFundo();
+    delay(1);
+  } while (millis() - inicio < ms);
 }
 
 // ------------------------------------------------------------ relatórios
+// Durante um teste, tudo o que aparece na saída também vai para um arquivo.
+File arqRelatorio;
+uint32_t relAtual = 0;
+
 void iniciarArquivos() {
-  fsOk = LittleFS.begin(true);
-  if (!fsOk) saida.println("(sem area de arquivos: os relatorios nao serao guardados)");
+  fsOk = montarArquivos();
+  if (!fsOk) saida.println("(sem area de arquivos: rede e relatorios nao serao guardados)");
 }
 
 void nomeRelatorio(uint32_t n, char *dst, size_t tam) { snprintf(dst, tam, "/r%lu.txt", (unsigned long)n); }
 
-void salvarRelatorio(size_t desde, const char *titulo) {
-  if (!fsOk) return;
-  const uint32_t n = prefs.getUInt("nrel", 0) + 1;
-  prefs.putUInt("nrel", n);
+void abrirRelatorio(const char *titulo) {
+  if (!fsOk || arqRelatorio) return;
+  relAtual = prefs.getUInt("nrel", 0) + 1;
+  prefs.putUInt("nrel", relAtual);
   char nome[20];
-  nomeRelatorio(n, nome, sizeof nome);
-  File f = LittleFS.open(nome, "w");
-  if (!f) {
-    saida.println("(nao consegui gravar o relatorio)");
-    return;
-  }
-  char hora[40];
-  textoHoraAgora(hora, sizeof hora);
-  f.printf("Relatorio %lu - %s - %s - MAC %s\n", (unsigned long)n, titulo, hora, WiFi.macAddress().c_str());
-  if (desde < saida.inicioDisponivel()) {
-    f.println("(o comeco se perdeu: saida longa demais)");
-    desde = saida.inicioDisponivel();
-  }
-  char bloco[512];
-  const size_t fim = saida.total();
-  while (desde < fim) {
-    const size_t k = saida.copiar(desde, bloco, sizeof bloco);
-    if (!k) break;
-    f.write((const uint8_t *)bloco, k);
-    desde += k;
-  }
-  f.close();
-  if (n > MAX_RELATORIOS) {
-    nomeRelatorio(n - MAX_RELATORIOS, nome, sizeof nome);
+  if (relAtual > MAX_RELATORIOS) {  // apaga o mais antigo
+    nomeRelatorio(relAtual - MAX_RELATORIOS, nome, sizeof nome);
     LittleFS.remove(nome);
   }
-  saida.printf("(relatorio %lu guardado na memoria do ESP: comando 'relatorio %lu' ou pela pagina)\n", (unsigned long)n,
-               (unsigned long)n);
+  nomeRelatorio(relAtual, nome, sizeof nome);
+  arqRelatorio = LittleFS.open(nome, "w");
+  if (!arqRelatorio) {
+    saida.println("(nao consegui criar o relatorio na memoria)");
+    return;
+  }
+  char hora[48];
+  textoHoraAgora(hora, sizeof hora);
+  arqRelatorio.printf("Relatorio %lu - %s - %s - %s MAC %s\n", (unsigned long)relAtual, titulo, hora, NOME_CHIP,
+                      WiFi.macAddress().c_str());
+  saida.copiarPara(&arqRelatorio);
+}
+
+void sincronizarRelatorio() {
+  if (arqRelatorio) arqRelatorio.flush();
+}
+
+void fecharRelatorio() {
+  if (!arqRelatorio) return;
+  saida.copiarPara(nullptr);
+  char hora[48];
+  textoHoraAgora(hora, sizeof hora);
+  arqRelatorio.printf("(fim do relatorio %lu: %s)\n", (unsigned long)relAtual, hora);
+  arqRelatorio.close();
+  saida.printf("(relatorio %lu guardado na memoria do ESP: comando 'relatorio %lu' ou pela pagina)\n",
+               (unsigned long)relAtual, (unsigned long)relAtual);
 }
 
 void listarRelatorios(Print &p, bool paraPagina) {
@@ -108,7 +138,8 @@ void listarRelatorios(Print &p, bool paraPagina) {
 void mostrarRelatorio(uint32_t n) {
   char nome[20];
   nomeRelatorio(n, nome, sizeof nome);
-  File f = fsOk ? LittleFS.open(nome, "r") : File();
+  File f;
+  if (fsOk) f = LittleFS.open(nome, "r");
   if (!f) {
     saida.printf("Relatorio %lu nao existe. Veja: relatorios\n", (unsigned long)n);
     return;
@@ -119,6 +150,7 @@ void mostrarRelatorio(uint32_t n) {
     const size_t k = f.read((uint8_t *)bloco, sizeof bloco);
     if (!k) break;
     saida.write((const uint8_t *)bloco, k);
+    servicoFundo();
   }
   f.close();
   saida.printf("======== fim do relatorio %lu ========\n", (unsigned long)n);
@@ -126,6 +158,10 @@ void mostrarRelatorio(uint32_t n) {
 
 void apagarRelatorios() {
   if (!fsOk) return;
+  if (arqRelatorio) {
+    saida.println("Espere o teste terminar para apagar os relatorios.");
+    return;
+  }
   const uint32_t ultimo = prefs.getUInt("nrel", 0);
   for (uint32_t n = ultimo > MAX_RELATORIOS ? ultimo - MAX_RELATORIOS + 1 : 1; n <= ultimo; n++) {
     char nome[20];
@@ -168,15 +204,18 @@ void enviarLog() {
 }
 
 void enviarEstado() {
-  char nomeRede[80];
+  char nomeRede[80], rtcJson[100];
   escaparJson(rede, nomeRede, sizeof nomeRede);
-  char b[520];
+  escaparJson(situacaoRtc, rtcJson, sizeof rtcJson);
+  char b[640];
   snprintf(b, sizeof b,
            "{\"mac\":\"%s\",\"chip\":\"%s\",\"rede\":\"%s\",\"conectado\":%s,\"ip\":\"%s\",\"ocupado\":%s,"
-           "\"conclusao\":%u,\"texto\":\"%s\",\"potencia\":\"%s\",\"total\":%lu}",
-           WiFi.macAddress().c_str(), ESP.getChipModel(), nomeRede, WiFi.status() == WL_CONNECTED ? "true" : "false",
+           "\"conclusao\":%u,\"texto\":\"%s\",\"potencia\":\"%s\",\"pot\":\"%s\",\"rtc\":\"%s\",\"rele\":%lu,"
+           "\"total\":%lu}",
+           WiFi.macAddress().c_str(), NOME_CHIP, nomeRede, WiFi.status() == WL_CONNECTED ? "true" : "false",
            txtIp(WiFi.localIP()), ocupado ? "true" : "false", conclusao, textoConclusao(conclusao), textoPotencia(),
-           (unsigned long)saida.total());
+           potencia == 17 ? "8.5" : potencia == 22 ? "11" : potencia == 30 ? "15" : "max", rtcJson,
+           (unsigned long)vezesRele, (unsigned long)saida.total());
   servidor.sendHeader("Cache-Control", "no-store");
   servidor.send(200, "application/json", b);
 }
@@ -191,6 +230,11 @@ void receberComando() {
 }
 
 void receberRede() {
+  if (ocupado) {
+    saida.println("(pagina: espere o teste terminar para mudar a rede)");
+    servidor.send(409, "text/plain", "ocupado");
+    return;
+  }
   if (servidor.hasArg("rede")) {
     snprintf(rede, sizeof rede, "%s", servidor.arg("rede").c_str());
     snprintf(senha, sizeof senha, "%s", servidor.arg("senha").c_str());
@@ -220,7 +264,8 @@ void enviarRelatorio() {
   const uint32_t n = servidor.hasArg("n") ? strtoul(servidor.arg("n").c_str(), NULL, 10) : 0;
   char nome[20];
   nomeRelatorio(n, nome, sizeof nome);
-  File f = fsOk ? LittleFS.open(nome, "r") : File();
+  File f;
+  if (fsOk) f = LittleFS.open(nome, "r");
   if (!f) {
     servidor.send(404, "text/plain", "relatorio nao existe");
     return;
@@ -239,14 +284,14 @@ void iniciarPagina() {
   servidor.on("/api/relatorios", HTTP_GET, enviarRelatorios);
   servidor.on("/relatorio", HTTP_GET, enviarRelatorio);
   servidor.on("/api/apagar", HTTP_POST, []() {
-    apagarRelatorios();
+    enfileirar("apagar-relatorios");
     servidor.send(200, "text/plain", "ok");
   });
   servidor.onNotFound([]() { servidor.send(404, "text/plain", "nao existe; abra http://192.168.4.1/"); });
   servidor.begin();
 }
 
-// ------------------------------------------------------------ LED e botão
+// ------------------------------------------------------------ LED e botões
 // LED: piscando rapido = trabalhando; parado = pisca N vezes a cada 3 s, N = conclusao
 // (1 internet liberada, 2 NTP interno sem login, 3 so NTP da internet, 4 so Date,
 //  5 nenhuma fonte, 6 nao conectou). Apagado = ainda sem teste.
@@ -262,24 +307,46 @@ void atualizarLed() {
   digitalWrite(PINO_LED, ligar ? LED_ACESO : !LED_ACESO);
 }
 
-// Botão (BOOT): aperta 1 vez = testar tudo; durante um teste = parar.
-void atualizarBotao() {
-  static uint32_t desde = 0;
-  static bool tratado = false;
-  if (digitalRead(PINO_BOTAO) == LOW) {
-    if (!desde) {
-      desde = millis();
-    } else if (!tratado && millis() - desde > 80) {
-      tratado = true;
-      if (ocupado) {
-        enfileirar("parar");
-      } else {
-        saida.println("(botao apertado: testar)");
-        enfileirar("testar");
+// Um botão até o GND: devolve true uma vez a cada aperto (com filtro de 80 ms).
+struct Botao {
+  uint8_t pino;
+  uint32_t desde;
+  bool tratado;
+  bool apertou() {
+    if (digitalRead(pino) == LOW) {
+      if (!desde) {
+        desde = millis() | 1;
+      } else if (!tratado && millis() - desde > 80) {
+        tratado = true;
+        return true;
       }
+    } else {
+      desde = 0;
+      tratado = false;
     }
-  } else {
-    desde = 0;
-    tratado = false;
+    return false;
+  }
+};
+Botao botaoTeste = {PINO_BOTAO_TESTE, 0, false};
+Botao botaoRele = {PINO_BOTAO_RELE, 0, false};
+
+// FLASH/BOOT: aperta 1 vez = testar tudo; durante um teste = parar.
+// S1: testa o relé (fora de um teste).
+void atualizarBotoes() {
+  if (botaoTeste.apertou()) {
+    if (ocupado) {
+      enfileirar("parar");
+    } else {
+      saida.println("(botao FLASH/BOOT apertado: testar)");
+      enfileirar("testar");
+    }
+  }
+  if (botaoRele.apertou()) {
+    if (ocupado) {
+      saida.println("(botao S1: espere o teste terminar para testar o rele)");
+    } else {
+      saida.println("(botao S1 apertado: rele)");
+      enfileirar("rele");
+    }
   }
 }

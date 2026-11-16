@@ -283,7 +283,7 @@ inline bool ipPrivado(uint8_t a, uint8_t b) {
          (a == 100 && b >= 64 && b <= 127) || (a == 169 && b == 254);
 }
 
-// Códigos de desconexão do Wi-Fi do ESP32 (wifi_err_reason_t).
+// Códigos de desconexão do Wi-Fi (os mesmos no ESP32 e no ESP8266 até o 204).
 inline const char *motivoQueda(int r) {
   switch (r) {
     case 2: return "autenticacao expirou: o roteador nao aceitou o aparelho (comum com filtro de MAC)";
@@ -336,6 +336,18 @@ inline const char *nomeSeguranca(int m) {
     case 8: return "WAPI";
     case 9: return "OWE";
     default: return "outra";
+  }
+}
+
+// Tipo de segurança da rede no ESP8266 (ENC_TYPE_* de WiFi.encryptionType()).
+inline const char *nomeSeguranca8266(int e) {
+  switch (e) {
+    case 7: return "aberta";
+    case 5: return "WEP";
+    case 2: return "WPA";
+    case 4: return "WPA2";
+    case 8: return "WPA/WPA2";
+    default: return "outra (Enterprise?)";
   }
 }
 

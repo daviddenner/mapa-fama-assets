@@ -1,5 +1,5 @@
 // ============================================================================
-//  Teste de rede para o sino (ESP32 ou ESP32-C3)
+//  Teste de rede e da placa do sino (ESP-12/ESP8266, ESP32 ou ESP32-C3)
 //
 //  Descobre se dá para pegar a hora certa pela rede da instituição SEM fazer o
 //  login da página (captcha) e sem o MAC estar cadastrado. Tenta TODAS as
@@ -9,65 +9,74 @@
 //    - a hora do cabeçalho "Date" das páginas (inclusive a de login), refinada
 //      para alguns milissegundos;
 //    - ICMP timestamp, TIME (porta 37), DAYTIME (porta 13) e NTP por difusão.
-//  Mostra o MAC (para pedir o cadastro à TI), explica por que a conexão foi
-//  recusada e termina com um resumo e uma conclusão.
+//  Testa também a placa do sino: relógio DS3231 (e quanto ele está fora da
+//  hora da rede) e relé. Mostra o MAC (para pedir o cadastro à TI), explica
+//  por que a conexão foi recusada e termina com um resumo e uma conclusão.
 //  Ele NÃO faz login e não tenta passar pelo captcha.
 //
 //  Três jeitos de usar, todos ao mesmo tempo:
 //    1. Monitor serial: 115200 baud, final de linha "Nova linha". Digite "ajuda".
 //    2. Celular: rede Wi-Fi "TESTE-SINO" (senha sino12345), http://192.168.4.1
-//    3. Sem nada: botão BOOT inicia o teste; o LED pisca a conclusão (veja o
-//       README). O relatório fica guardado na memória do ESP.
+//    3. Sem nada: botão FLASH (ESP-12) ou BOOT (ESP32) inicia o teste; o LED
+//       pisca a conclusão. O relatório fica guardado na memória do ESP.
 //
-//  Placa na Arduino IDE (pacote esp32 da Espressif, 2.x ou 3.x):
-//    ESP32:    "ESP32 Dev Module"
-//    ESP32-C3: "ESP32C3 Dev Module" com "USB CDC On Boot: Enabled"
+//  Placa na Arduino IDE:
+//    ESP-12 avulso: pacote esp8266, "Generic ESP8266 Module", Flash Size 4MB
+//                   (FS:2MB OTA:~1019KB)
+//    NodeMCU:       pacote esp8266, "NodeMCU 1.0 (ESP-12E Module)"
+//    ESP32:         pacote esp32, "ESP32 Dev Module"
+//    ESP32-C3:      pacote esp32, "ESP32C3 Dev Module", "USB CDC On Boot: Enabled"
 // ============================================================================
-#include <Preferences.h>
-#include <WebServer.h>
-#include <WiFi.h>
-#include <WiFiClientSecure.h>
-#include <WiFiUdp.h>
-
 #include "analise.h"
-#include "esp_timer.h"
+#include "compat.h"
 #include "pagina_teste.h"
 #include "registro.h"
 #include "tempo.h"
 
 // ------------------------------------------------------------ Configuração
-#define FUSO_MINUTOS (-240)        // Mato Grosso do Sul: UTC-4
-#define NOME_NA_REDE "sino-teste"  // nome que aparece para a TI na lista de aparelhos
+#define FUSO_MINUTOS (-240)         // Mato Grosso do Sul: UTC-4
+#define NOME_NA_REDE "sino-teste"   // nome que aparece para a TI na lista de aparelhos
 #define AP_TESTE_NOME "TESTE-SINO"  // Wi-Fi do próprio ESP, para a página
 #define AP_TESTE_SENHA "sino12345"
-#define MAX_RELATORIOS 6  // quantos relatórios ficam guardados na memória
+#define RELE_ATIVO_EM_BAIXO 0  // 0 = relé pelo BC548 (como no sino); 1 = módulo relé que liga em 0 V
 
-#if defined(CONFIG_IDF_TARGET_ESP32C3)
-#define PINO_LED 8  // LED azul das placas C3 "Super Mini" (acende em 0)
+#if defined(ESP8266)
+// ESP-12 / NodeMCU: os mesmos pinos do sino (veja hardware/PROTOBOARD_ESP12.md)
+#define MAX_RELATORIOS 4
+#define PINO_SDA 4           // D2: SDA do DS3231
+#define PINO_SCL 5           // D1: SCL do DS3231
+#define PINO_RELE 12         // D6: resistor de 1 kΩ até a base do BC548
+#define PINO_BOTAO_RELE 13   // D7: botão S1 até o GND = testar o relé
+#define PINO_BOTAO_TESTE 0   // FLASH (GPIO0) = testar tudo
+#define PINO_LED 2           // LED azul do próprio ESP-12 (acende em 0)
 #define LED_ACESO LOW
-#define PINO_BOTAO 9  // botão BOOT
-#else
-#define PINO_LED 2  // LED azul do ESP32 Dev Module
+#elif defined(CONFIG_IDF_TARGET_ESP32C3)
+#define MAX_RELATORIOS 6
+#define PINO_SDA 4
+#define PINO_SCL 5
+#define PINO_RELE 3
+#define PINO_BOTAO_RELE 1
+#define PINO_BOTAO_TESTE 9  // BOOT
+#define PINO_LED 8          // LED azul das placas C3 "Super Mini" (acende em 0)
+#define LED_ACESO LOW
+#else  // ESP32 Dev Module
+#define MAX_RELATORIOS 6
+#define PINO_SDA 21
+#define PINO_SCL 22
+#define PINO_RELE 26
+#define PINO_BOTAO_RELE 27
+#define PINO_BOTAO_TESTE 0  // BOOT
+#define PINO_LED 2
 #define LED_ACESO HIGH
-#define PINO_BOTAO 0  // botão BOOT
-#endif
-
-// Pergunta ao DHCP qual é o servidor de hora da rede. Se der erro de
-// compilação nesta parte, mude para 0: o resto do teste continua igual.
-#define TESTAR_NTP_DO_DHCP 1
-
-#if TESTAR_NTP_DO_DHCP
-#include "esp_sntp.h"
 #endif
 
 // ------------------------------------------------------------------ Estado
 Registro saida;  // tudo o que o teste mostra: monitor serial + página + relatórios
 Preferences prefs;
-WebServer servidor(80);
-QueueHandle_t filaCmd;
+ServidorWeb servidor(80);
 char rede[33] = "";
 char senha[65] = "";
-volatile bool ocupado = false;      // uma tarefa (teste, vigia...) está rodando
+volatile bool ocupado = false;      // um teste (ou a vigia) está rodando
 volatile bool pararPedido = false;  // alguém pediu para parar
 uint8_t conclusao = 0;              // código do resumo (o LED pisca este número)
 uint8_t potencia = 0;               // potência do Wi-Fi: 0 = máxima; senão dBm x 2
@@ -75,7 +84,7 @@ bool potenciaTentada = false;       // já tentou reduzir a potência neste test
 WiFiUDP escutaNtp;
 bool escutando = false;
 
-// Eventos do Wi-Fi: chegam por outra tarefa do ESP32 e são lidos depois.
+// Eventos do Wi-Fi: chegam por fora do laço principal e são lidos depois.
 volatile bool evAssociou = false;
 volatile bool evTemIP = false;
 volatile uint8_t filaMotivo[16];
@@ -85,7 +94,7 @@ enum TipoFonte { NTP_INTERNO, NTP_EXTERNO, DATE_PAGINA, TEMPO_ANTIGO };
 struct Fonte {  // uma fonte de hora que funcionou
   char nome[72];
   TipoFonte tipo;
-  int64_t deslocUs;     // hora da fonte - relógio do ESP32
+  int64_t deslocUs;     // hora da fonte - relógio do ESP
   int64_t incertezaUs;  // margem de erro (+-)
   uint32_t ip;          // de onde veio (0 se não se aplica)
 };
@@ -107,8 +116,6 @@ struct Resultado {  // só tipos simples: pode ser zerado com memset
 } res;
 
 // ============================================================ Utilidades
-int64_t agoraUs() { return esp_timer_get_time(); }
-
 const char *txtIp(const IPAddress &ip) {
   static char buf[4][16];
   static uint8_t i = 0;
@@ -119,7 +126,10 @@ const char *txtIp(const IPAddress &ip) {
 bool ipVazio(const IPAddress &ip) { return (uint32_t)ip == 0; }
 bool ehPrivado(const IPAddress &ip) { return ipPrivado(ip[0], ip[1]); }
 
-void titulo(const char *t) { saida.printf("\n---- %s ----\n", t); }
+void titulo(const char *t) {
+  servicoFundo();
+  saida.printf("\n---- %s ----\n", t);
+}
 
 void imprimirMs(int64_t us) {
   if (us < 10000) {
@@ -162,16 +172,21 @@ int melhorFonte() {
   return m;
 }
 
-// "dd/mm/aaaa hh:mm:ss" pela melhor fonte, ou "hora desconhecida"
+// "dd/mm/aaaa hh:mm:ss" pela melhor fonte; sem fonte, pelo DS3231; senão "hora desconhecida"
 void textoHoraAgora(char *dst, size_t tam) {
   const int m = melhorFonte();
-  if (m < 0) {
+  uint32_t s;
+  const char *origem = "";
+  if (m >= 0) {
+    s = (uint32_t)((agoraUs() + fontes[m].deslocUs) / 1000000LL);
+  } else if (horaDoRtc(s)) {
+    origem = " (DS3231)";
+  } else {
     snprintf(dst, tam, "hora desconhecida");
     return;
   }
-  const int64_t s = (agoraUs() + fontes[m].deslocUs) / 1000000LL;
-  const DataHora t = deEpoch((uint32_t)s + FUSO_MINUTOS * 60);
-  snprintf(dst, tam, "%02u/%02u/%04u %02u:%02u:%02u", t.dia, t.mes, t.ano, t.hora, t.min, t.seg);
+  const DataHora t = deEpoch(s + FUSO_MINUTOS * 60);
+  snprintf(dst, tam, "%02u/%02u/%04u %02u:%02u:%02u%s", t.dia, t.mes, t.ano, t.hora, t.min, t.seg, origem);
 }
 
 const char *textoConclusao(uint8_t c) {
@@ -187,7 +202,7 @@ const char *textoConclusao(uint8_t c) {
 }
 
 void mostrarMac() {
-  saida.printf("MAC deste %s: %s   <- e este que a TI cadastra\n", ESP.getChipModel(), WiFi.macAddress().c_str());
+  saida.printf("MAC deste %s: %s   <- e este que a TI cadastra\n", NOME_CHIP, WiFi.macAddress().c_str());
   saida.printf("Nome na rede:    %s\n", NOME_NA_REDE);
 }
 
@@ -208,13 +223,7 @@ const char *textoPotencia() {
   }
 }
 
-void aplicarPotencia() {
-  wifi_power_t p = WIFI_POWER_19_5dBm;
-  if (potencia == 17) p = WIFI_POWER_8_5dBm;
-  if (potencia == 22) p = WIFI_POWER_11dBm;
-  if (potencia == 30) p = WIFI_POWER_15dBm;
-  WiFi.setTxPower(p);
-}
+void aplicarPotencia() { wifiPotencia(potencia); }
 
 void definirPotencia(const char *texto) {
   uint8_t nova;
@@ -237,6 +246,23 @@ void definirPotencia(const char *texto) {
 }
 
 // ============================================================ Wi-Fi
+void anotarQueda(uint8_t motivo) {
+  evTemIP = false;
+  const uint8_t f = filaFim;
+  filaMotivo[f % 16] = motivo;
+  filaFim = f + 1;
+}
+
+#if defined(ESP8266)
+WiFiEventHandler aoAssociar, aoReceberIp, aoCair;  // precisam ficar guardados
+
+void iniciarEventosWiFi() {
+  aoAssociar = WiFi.onStationModeConnected([](const WiFiEventStationModeConnected &) { evAssociou = true; });
+  aoReceberIp = WiFi.onStationModeGotIP([](const WiFiEventStationModeGotIP &) { evTemIP = true; });
+  aoCair = WiFi.onStationModeDisconnected(
+      [](const WiFiEventStationModeDisconnected &e) { anotarQueda((uint8_t)e.reason); });
+}
+#else
 void aoEventoWiFi(WiFiEvent_t evento, WiFiEventInfo_t info) {
   switch (evento) {
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:
@@ -245,17 +271,16 @@ void aoEventoWiFi(WiFiEvent_t evento, WiFiEventInfo_t info) {
     case ARDUINO_EVENT_WIFI_STA_GOT_IP:
       evTemIP = true;
       break;
-    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED: {
-      evTemIP = false;
-      const uint8_t f = filaFim;
-      filaMotivo[f % 16] = info.wifi_sta_disconnected.reason;
-      filaFim = f + 1;
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+      anotarQueda(info.wifi_sta_disconnected.reason);
       break;
-    }
     default:
       break;
   }
 }
+
+void iniciarEventosWiFi() { WiFi.onEvent(aoEventoWiFi); }
+#endif
 
 void imprimirQuedas() {
   while (filaIni != filaFim) {
@@ -267,29 +292,9 @@ void imprimirQuedas() {
   }
 }
 
-#if TESTAR_NTP_DO_DHCP
-void pedirNtpAoDhcp() {
-#if ESP_ARDUINO_VERSION_MAJOR >= 3
-  esp_sntp_servermode_dhcp(true);
-#else
-  sntp_servermode_dhcp(1);
-#endif
-}
-
-IPAddress ntpInformadoPeloDhcp() {
-#if ESP_ARDUINO_VERSION_MAJOR >= 3
-  const ip_addr_t *a = esp_sntp_getserver(0);
-#else
-  const ip_addr_t *a = sntp_getserver(0);
-#endif
-  if (a == NULL || !IP_IS_V4(a)) return IPAddress((uint32_t)0);
-  return IPAddress((uint32_t)ip4_addr_get_u32(ip_2_ip4(a)));
-}
-#endif
-
 void desconectar() {
   WiFi.disconnect();
-  delay(300);
+  pausa(300);
   filaIni = filaFim;  // descarta o aviso da nossa própria desconexão
   evAssociou = false;
   evTemIP = false;
@@ -297,10 +302,9 @@ void desconectar() {
 
 bool tentarConectar() {
   desconectar();
-#if TESTAR_NTP_DO_DHCP
   pedirNtpAoDhcp();
-#endif
   saida.printf("Conectando em \"%s\" (%s, potencia %s)...\n", rede, senha[0] ? "com senha" : "rede aberta", textoPotencia());
+  saida.println("  (enquanto conecta, a pagina pode ficar alguns segundos sem responder)");
   if (senha[0]) {
     WiFi.begin((const char *)rede, (const char *)senha);
   } else {
@@ -325,7 +329,7 @@ bool tentarConectar() {
       saida.printf("  CONECTADO em %.1f s, IP %s\n", (millis() - inicio) / 1000.0, txtIp(WiFi.localIP()));
       return true;
     }
-    delay(50);
+    pausa(50);
   }
   imprimirQuedas();
   if (res.associou) {
@@ -339,10 +343,10 @@ bool tentarConectar() {
   return false;
 }
 
-// Falha que parece ser de radio (e nao de cadastro)? Ai vale tentar com menos potencia.
+// Falha que parece ser de rádio (e não de cadastro)? Aí vale tentar com menos potência.
 bool pareceProblemaDeRadio() {
   if (res.temIP) return false;
-  if (!res.associou && res.quedas == 0) return true;  // ninguem respondeu
+  if (!res.associou && res.quedas == 0) return true;  // ninguém respondeu
   const int m = res.ultimoMotivo;
   return m == 2 || m == 15 || m == 201 || m == 204 || m == 205;
 }
@@ -351,7 +355,7 @@ bool conectar() {
   if (tentarConectar()) return true;
   if (potencia == 0 && !potenciaTentada && pareceProblemaDeRadio()) {
     potenciaTentada = true;
-    saida.println("  Tentando de novo com menos potencia de Wi-Fi (placas ESP32-C3 Super Mini costumam precisar)...");
+    saida.println("  Tentando de novo com menos potencia de Wi-Fi (placas com antena ruim costumam precisar)...");
     potencia = 17;
     const bool ok = tentarConectar();
     if (ok) {
@@ -359,6 +363,7 @@ bool conectar() {
       saida.println("  Funcionou com 8,5 dBm: potencia salva ('potencia max' desfaz).");
     } else {
       potencia = 0;
+      aplicarPotencia();
     }
     return ok;
   }
@@ -374,10 +379,8 @@ void mostrarInfo() {
   saida.printf("  Mascara .......... %s\n", txtIp(WiFi.subnetMask()));
   saida.printf("  Roteador ......... %s\n", txtIp(WiFi.gatewayIP()));
   saida.printf("  DNS .............. %s  %s\n", txtIp(WiFi.dnsIP(0)), txtIp(WiFi.dnsIP(1)));
-#if TESTAR_NTP_DO_DHCP
   const IPAddress n = ntpInformadoPeloDhcp();
   saida.printf("  NTP do DHCP ...... %s\n", ipVazio(n) ? "nenhum informado" : txtIp(n));
-#endif
   saida.printf("  Sinal ............ %d dBm, canal %ld, roteador %s\n", (int)WiFi.RSSI(), (long)WiFi.channel(),
                WiFi.BSSIDstr().c_str());
 }
@@ -404,8 +407,8 @@ void procurarRedes() {
   for (int i = 0; i < total; i++) {
     const int k = ordem[i];
     const String nome = WiFi.SSID(k);
-    saida.printf("  %4ld   %4ld   %-26s  %s%s\n", (long)WiFi.RSSI(k), (long)WiFi.channel(k),
-                 nomeSeguranca((int)WiFi.encryptionType(k)), nome.length() ? nome.c_str() : "(oculta)",
+    saida.printf("  %4ld   %4ld   %-26s  %s%s\n", (long)WiFi.RSSI(k), (long)WiFi.channel(k), segurancaDaRede(k),
+                 nome.length() ? nome.c_str() : "(oculta)",
                  (rede[0] && strcmp(nome.c_str(), rede) == 0) ? "   <- escolhida" : "");
   }
   WiFi.scanDelete();
@@ -453,7 +456,7 @@ bool ntpBruto(const IPAddress &ip, int64_t &desloc, int64_t &atraso, RespostaNtp
     return false;
   }
   bool ok = false;
-  while (agoraUs() - t1 < 1500000) {
+  while (agoraUs() - t1 < 1500000) {  // sem atender a página aqui: atrapalharia a medida
     if (udp.parsePacket() > 0) {
       const int64_t t4 = agoraUs();
       uint8_t resp[64];
@@ -474,6 +477,7 @@ bool ntpBruto(const IPAddress &ip, int64_t &desloc, int64_t &atraso, RespostaNtp
 
 // Pergunta a hora a um servidor NTP e mostra o resultado.
 bool consultarNtp(const IPAddress &ip, const char *rotulo, bool guardar) {
+  servicoFundo();
   saida.printf("  %-36s ", rotulo);
   int64_t desloc, atraso;
   RespostaNtp r;
@@ -511,7 +515,7 @@ bool consultarNtp(const IPAddress &ip, const char *rotulo, bool guardar) {
 bool pedirHttp(const char *url, RespostaHttp &r, AmostraData &amostra, bool lerTitulo, const char *&erro) {
   limparHttp(r);
   erro = "";
-  Url u;
+  static Url u;
   if (!lerUrl(url, u)) {
     erro = "endereco invalido";
     return false;
@@ -519,19 +523,15 @@ bool pedirHttp(const char *url, RespostaHttp &r, AmostraData &amostra, bool lerT
   WiFiClient simples;
   WiFiClientSecure seguro;
   Client *c;
-  int ok;
   if (u.https) {
-    seguro.setInsecure();  // só lemos o cabeçalho; não enviamos dado nenhum
-    seguro.setHandshakeTimeout(8);
-    ok = seguro.connect(u.host, u.porta, 6000);
+    if (!conectarTls(seguro, u.host, u.porta, erro)) return false;
     c = &seguro;
   } else {
-    ok = simples.connect(u.host, u.porta, 4000);
+    if (!conectarTcp(simples, u.host, u.porta, 4000)) {
+      erro = "nao conectou";
+      return false;
+    }
     c = &simples;
-  }
-  if (!ok) {
-    erro = u.https ? "nao conectou (porta 443 bloqueada ou falha no TLS)" : "nao conectou";
-    return false;
   }
   amostra.envioUs = agoraUs();
   amostra.recebUs = 0;
@@ -543,7 +543,7 @@ bool pedirHttp(const char *url, RespostaHttp &r, AmostraData &amostra, bool lerT
     c->print(":");
     c->print(u.porta);
   }
-  c->print("\r\nUser-Agent: Mozilla/5.0 (teste-sino-esp32)\r\nAccept: */*\r\nConnection: close\r\n\r\n");
+  c->print("\r\nUser-Agent: Mozilla/5.0 (teste-sino-esp)\r\nAccept: */*\r\nConnection: close\r\n\r\n");
 
   char linha[200];
   size_t n = 0;
@@ -573,7 +573,11 @@ bool pedirHttp(const char *url, RespostaHttp &r, AmostraData &amostra, bool lerT
     }
   }
   if (fimCabecalho && lerTitulo) {
+#if defined(ESP8266)
+    static char corpo[1536];
+#else
     static char corpo[3072];
+#endif
     size_t m = 0;
     limite = millis() + 3000;
     while (m < sizeof(corpo) - 1 && (int32_t)(millis() - limite) < 0) {
@@ -601,8 +605,9 @@ bool pedirHttp(const char *url, RespostaHttp &r, AmostraData &amostra, bool lerT
 
 // Mostra o resultado de um pedido HTTP e guarda a hora do Date como fonte.
 bool testarPagina(const char *url, bool guardar) {
+  servicoFundo();
   saida.printf("  %s\n", url);
-  RespostaHttp r;
+  static RespostaHttp r;
   AmostraData a;
   const char *erro;
   if (!pedirHttp(url, r, a, true, erro)) {
@@ -651,7 +656,7 @@ bool testarPagina(const char *url, bool guardar) {
 
 // Uma amostra do Date da página (envio, chegada e segundo informado).
 bool amostrarData(const char *url, AmostraData &a) {
-  RespostaHttp r;
+  static RespostaHttp r;
   const char *erro;
   return pedirHttp(url, r, a, false, erro) && r.temData;
 }
@@ -671,7 +676,7 @@ void refinarData(const char *url) {
   bool virou = false;
   const uint32_t inicio = millis();
   while (millis() - inicio < 2500) {
-    delay(100);
+    pausa(100);
     if (!amostrarData(url, at)) break;
     pedidos++;
     if (at.segundo == ant.segundo + 1) {
@@ -688,7 +693,7 @@ void refinarData(const char *url) {
   int64_t desloc = 0, incerteza = 0;
   acharVirada(par, 2, desloc, incerteza);
 
-  // Próxima virada (para o segundo at.segundo + 1), no relógio do ESP32:
+  // Próxima virada (para o segundo at.segundo + 1), no relógio do ESP:
   const int64_t prevista = (int64_t)(at.segundo + 1) * 1000000LL - desloc;
   const int64_t duracao = at.recebUs - at.envioUs;
   while (agoraUs() < prevista - incerteza - 2 * duracao - 5000) delay(1);
@@ -771,6 +776,7 @@ void imprimirResumo() {
     saida.printf("DNS .............. %s\n",
                  res.dnsOk ? (res.dnsDesviado ? "responde, mas desviado para IP interno" : "funciona") : "nao responde");
   }
+  resumoPlaca();
   saida.println("Fontes de hora que funcionaram:");
   const int m = melhorFonte();
   if (m < 0) saida.println("  nenhuma");
@@ -838,20 +844,21 @@ void testar() {
   nFontes = 0;
   conclusao = 0;
   potenciaTentada = false;
-  const size_t inicioRelatorio = saida.total();
+  abrirRelatorio(rede);
   saida.println();
-  saida.println("################ TESTE DA REDE ################");
+  saida.println("################ TESTE DA REDE E DA PLACA ################");
   mostrarMac();
+  testarPlaca();
   procurarRedes();
 
   titulo("1. Conexao");
   if (!conectar()) {
     desconectar();  // para de tentar (evita ficar repetindo)
     imprimirResumo();
-    salvarRelatorio(inicioRelatorio, rede);
+    fecharRelatorio();
     return;
   }
-  comecarEscutaNtp();  // fica escutando anuncios de hora enquanto o resto roda
+  escutando = escutarMulticast(escutaNtp, IPAddress(224, 0, 1, 1), 123);  // escuta anúncios de hora
 
   titulo("2. Dados da rede");
   mostrarInfo();
@@ -889,16 +896,14 @@ void testar() {
 
   {
     titulo("6. Servidores de hora (NTP)");
-    Alvo alvos[10];
+    static Alvo alvos[10];
     int nAlvos = 0;
-#if TESTAR_NTP_DO_DHCP
     adicionarAlvo(alvos, nAlvos, 10, ntpInformadoPeloDhcp(), "informado pelo DHCP");
-#endif
     adicionarAlvo(alvos, nAlvos, 10, gw, "roteador");
     adicionarAlvo(alvos, nAlvos, 10, dns1, "DNS da rede");
     adicionarAlvo(alvos, nAlvos, 10, dns2, "DNS da rede");
     if (res.portal[0]) {
-      Url u;
+      static Url u;
       IPAddress ipPortal;
       if (lerUrl(res.portal, u) && resolver(u.host, ipPortal, false)) adicionarAlvo(alvos, nAlvos, 10, ipPortal, "pagina de login");
     }
@@ -911,7 +916,7 @@ void testar() {
 
     titulo("7. Outros jeitos de pegar a hora na propria rede");
     for (int i = 0; i < nAlvos && !pararPedido; i++) {
-      if (!ehPrivado(alvos[i].ip)) continue;  // so os aparelhos da rede
+      if (!ehPrivado(alvos[i].ip)) continue;  // só os aparelhos da rede
       sondarIcmpTimestamp(alvos[i].ip, alvos[i].rotulo);
       sondarPortaTcp(alvos[i].ip, 37, alvos[i].rotulo);
       sondarTimeUdp(alvos[i].ip, alvos[i].rotulo);
@@ -926,34 +931,36 @@ void testar() {
     saida.printf("  %s\n", res.urlData);
     refinarData(res.urlData);
   }
+  if (pararPedido) goto fim;
+  compararRtcComRede();
 fim:
   if (escutando) terminarEscutaNtp();
   if (pararPedido) saida.println("\n(teste interrompido a pedido)");
   imprimirResumo();
-  salvarRelatorio(inicioRelatorio, rede);
+  fecharRelatorio();
 }
 
 // ============================================================ Vigia
 // Fica conectado por um tempo, sem login, conferindo a hora a cada minuto:
-// mostra se o portal derruba quem nao fez login e se a fonte continua respondendo.
+// mostra se o portal derruba quem não fez login e se a fonte continua respondendo.
 void vigiar(int minutos) {
   if (!rede[0]) {
     saida.println("Escolha a rede primeiro (rede NOME).");
     return;
   }
-  const size_t inicioRelatorio = saida.total();
+  abrirRelatorio("vigia");
   saida.printf("\n######## VIGIA: %d min conectado sem login, conferindo a hora a cada minuto ########\n", minutos);
-  saida.println("(para interromper: parar, ou aperte o botao)");
+  saida.println("(para interromper: parar, ou aperte o botao FLASH/BOOT)");
   if (WiFi.status() != WL_CONNECTED) {
     memset(&res, 0, sizeof res);
     potenciaTentada = false;
     if (!conectar()) {
       desconectar();
-      salvarRelatorio(inicioRelatorio, "vigia (nao conectou)");
+      fecharRelatorio();
       return;
     }
   }
-  int alvo = -1;  // de preferencia um NTP da propria rede
+  int alvo = -1;  // de preferência um NTP da própria rede
   for (int i = 0; i < nFontes; i++)
     if (fontes[i].ip && fontes[i].tipo == NTP_INTERNO && alvo < 0) alvo = i;
   for (int i = 0; i < nFontes; i++)
@@ -1012,14 +1019,15 @@ void vigiar(int minutos) {
       } else {
         saida.println("ok");
       }
+      sincronizarRelatorio();
     }
-    delay(100);
+    pausa(100);
   }
   saida.printf("\nVIGIA: %lu min; quedas da conexao: %lu; conferencias ok: %lu; falhas: %lu\n",
                (unsigned long)((millis() - inicio) / 60000UL), (unsigned long)quedas, (unsigned long)ok,
                (unsigned long)falhas);
   if (quedas == 0 && falhas == 0) saida.println("  A rede manteve o aparelho conectado e respondendo sem login.");
-  salvarRelatorio(inicioRelatorio, "vigia");
+  fecharRelatorio();
 }
 
 // ============================================================ Comandos
@@ -1035,10 +1043,13 @@ void ajuda() {
   saida.println("  redes               procura as redes Wi-Fi por perto");
   saida.println("  rede NOME           escolhe a rede (fica salvo)");
   saida.println("  senha SENHA         senha da rede; 'senha' sozinho = rede aberta (fica salva)");
-  saida.println("  testar              conecta e faz todos os testes (2 a 4 minutos no maximo)");
+  saida.println("  testar              testa a placa, conecta e testa a rede (2 a 4 minutos)");
   saida.println("  vigiar [MIN]        fica conectado MIN minutos (30) conferindo a hora a cada minuto");
   saida.println("  parar               interrompe o teste ou a vigia");
   saida.println("  resumo              mostra de novo o resumo do ultimo teste");
+  saida.println("  rtc                 testa o relogio DS3231 (e compara com a hora da rede)");
+  saida.println("  rtc acertar         grava a hora da rede no DS3231, na virada do segundo");
+  saida.println("  rele [MS]           liga o rele por MS milissegundos (500)");
   saida.println("  relatorios          lista os relatorios guardados na memoria do ESP");
   saida.println("  relatorio N         mostra o relatorio N;  apagar-relatorios apaga todos");
   saida.println("  hora                hora atual segundo a melhor fonte encontrada");
@@ -1047,7 +1058,7 @@ void ajuda() {
   saida.println("  icmp IP             pede a hora por ICMP timestamp a um aparelho da rede");
   saida.println("  http ENDERECO       le cabecalho e titulo de uma pagina (http:// ou https://)");
   saida.println("  dns NOME            traduz um nome para IP");
-  saida.println("  potencia X          potencia do Wi-Fi: max, 8.5, 11 ou 15 dBm (C3 Super Mini: 8.5)");
+  saida.println("  potencia X          potencia do Wi-Fi: max, 8.5, 11 ou 15 dBm");
   saida.println("  desconectar         sai da rede;  esquecer apaga a rede e a senha salvas");
   saida.println("  reiniciar           reinicia o ESP");
   saida.println("  ajuda               esta lista");
@@ -1100,6 +1111,14 @@ void executar(char *linha) {
     saida.println("Nada em andamento.");
   } else if (!strcmp(linha, "resumo")) {
     imprimirResumo();
+  } else if (!strcmp(linha, "rtc")) {
+    if (!strcasecmp(arg, "acertar")) {
+      acertarRtc();
+    } else {
+      testarRtc(true);
+    }
+  } else if (!strcmp(linha, "rele")) {
+    testarRele(arg[0] ? (uint32_t)atol(arg) : 500);
   } else if (!strcmp(linha, "relatorios")) {
     listarRelatorios(saida, false);
   } else if (!strcmp(linha, "relatorio")) {
@@ -1195,41 +1214,40 @@ void lerSerial() {
 
 // ============================================================ main
 void setup() {
+  iniciarPlaca();  // primeiro: relé desligado
   Serial.begin(115200);
 #if ARDUINO_USB_CDC_ON_BOOT && defined(CONFIG_IDF_TARGET_ESP32C3)
-  Serial.setTxTimeoutMs(0);  // USB sem computador do outro lado: nao pode travar o teste
+  Serial.setTxTimeoutMs(0);  // USB sem computador do outro lado: não pode travar o teste
 #endif
   delay(1500);  // tempo para o monitor serial abrir
-  saida.iniciar();
   pinMode(PINO_LED, OUTPUT);
   digitalWrite(PINO_LED, !LED_ACESO);
-  pinMode(PINO_BOTAO, INPUT_PULLUP);
+  pinMode(PINO_BOTAO_TESTE, INPUT_PULLUP);
 
+  iniciarArquivos();  // antes das preferências: no ESP8266 elas ficam em arquivos
   prefs.begin("testerede", false);
   snprintf(rede, sizeof rede, "%s", prefs.getString("rede", "").c_str());
   snprintf(senha, sizeof senha, "%s", prefs.getString("senha", "").c_str());
   potencia = prefs.getUChar("pot", 0);
 
-  WiFi.onEvent(aoEventoWiFi);
+  iniciarEventosWiFi();
   WiFi.persistent(false);
-  WiFi.setHostname(NOME_NA_REDE);
+  wifiNomeNaRede(NOME_NA_REDE);
   WiFi.mode(WIFI_AP_STA);
-  WiFi.setSleep(false);  // sem economia de energia: mede o tempo da rede sem atrasos extras
+  wifiSemEconomia();  // sem economia de energia: mede o tempo da rede sem atrasos extras
   WiFi.softAP(AP_TESTE_NOME, AP_TESTE_SENHA);
   aplicarPotencia();
-  iniciarArquivos();
   iniciarPagina();
-
-  filaCmd = xQueueCreate(8, 160);
-  xTaskCreate(tarefaComandos, "comandos", 16384, NULL, 1, NULL);
 
   saida.println();
   saida.println("=================================================");
-  saida.printf(" Teste de rede para o sino (%s)\n", ESP.getChipModel());
+  saida.printf(" Teste de rede e da placa do sino (%s)\n", NOME_CHIP);
   saida.println(" (nao faz login nem tenta passar pelo captcha)");
   mostrarMac();
   mostrarComoAcessar();
-  saida.printf(" Botao BOOT = testar; LED pisca a conclusao. Potencia Wi-Fi: %s\n", textoPotencia());
+  saida.printf(" Botao GPIO%d (FLASH/BOOT) = testar tudo; S1 (GPIO%d) = testar o rele\n", PINO_BOTAO_TESTE,
+               PINO_BOTAO_RELE);
+  saida.printf(" LED pisca a conclusao. Potencia Wi-Fi: %s\n", textoPotencia());
   saida.println("=================================================");
   if (rede[0]) {
     saida.printf("Rede salva: \"%s\". Testando...\n", rede);
@@ -1241,10 +1259,17 @@ void setup() {
 }
 
 void loop() {
-  lerSerial();
-  servidor.handleClient();
-  if (!ocupado) imprimirQuedas();
-  atualizarLed();
-  atualizarBotao();
-  delay(5);
+  servicoFundo();
+  if (!ocupado) {
+    char linha[160];
+    if (tirarDaFila(linha, sizeof linha)) {
+      ocupado = true;
+      pararPedido = false;
+      executar(linha);
+      ocupado = false;
+    } else {
+      imprimirQuedas();
+    }
+  }
+  delay(2);
 }

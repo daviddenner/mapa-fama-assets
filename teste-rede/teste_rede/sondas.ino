@@ -6,78 +6,138 @@
 //    - NTP por difusão (broadcast/multicast): o ESP só escuta.
 //  Nenhuma delas envia dado nenhum além do próprio pedido.
 // ============================================================================
-#include <lwip/sockets.h>
 
 // ------------------------------------------------------------ ICMP timestamp
-bool sondarIcmpTimestamp(const IPAddress &ip, const char *rotulo) {
-  saida.printf("  ICMP timestamp %-22s ", rotulo);
-  const int s = lwip_socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-  if (s < 0) {
-    saida.println("(este pacote nao deixa abrir socket ICMP)");
-    return false;
+// Manda o pedido e espera a resposta certa por até 1 s. No ESP8266 usa a
+// interface "crua" do lwIP; no ESP32, um socket cru.
+#if defined(ESP8266)
+namespace icmpCru {
+volatile bool chegou = false;
+uint16_t idEsperado = 0, seqEsperada = 0;
+uint32_t recebMs = 0, envioMs = 0;
+int64_t chegadaUs = 0;
+
+// Chamada pelo lwIP para cada pacote ICMP que chega (com o cabeçalho IP).
+u8_t aoReceber(void *, struct raw_pcb *, struct pbuf *p, const ip_addr_t *) {
+  uint8_t b[64];
+  const u16_t n = pbuf_copy_partial(p, b, sizeof b, 0);
+  uint32_t r, e;
+  if (!chegou && lerIcmpTimestamp(b, n, idEsperado, seqEsperada, r, e)) {
+    recebMs = r;
+    envioMs = e;
+    chegadaUs = agoraUs();
+    chegou = true;
   }
+  return 0;  // não "come" o pacote: o lwIP continua tratando
+}
+}  // namespace icmpCru
+
+// 0 = respondeu; 1 = sem resposta; 2 = não consegui enviar
+int pedirIcmpTimestamp(const IPAddress &ip, uint16_t id, uint16_t seq, uint32_t &envioMs, int64_t &t1, int64_t &t4) {
+  struct raw_pcb *pcb = raw_new(IP_PROTO_ICMP);
+  if (!pcb) return 2;
+  raw_recv(pcb, icmpCru::aoReceber, NULL);
+  struct pbuf *p = pbuf_alloc(PBUF_IP, 20, PBUF_RAM);
+  if (!p) {
+    raw_remove(pcb);
+    return 2;
+  }
+  montarIcmpTimestamp((uint8_t *)p->payload, id, seq, (uint32_t)(agoraUs() / 1000));
+  ip_addr_t destino;
+  ip_addr_set_ip4_u32(&destino, (uint32_t)ip);
+  icmpCru::chegou = false;
+  icmpCru::idEsperado = id;
+  icmpCru::seqEsperada = seq;
+  t1 = agoraUs();
+  const err_t erro = raw_sendto(pcb, p, &destino);
+  pbuf_free(p);
+  if (erro != ERR_OK) {
+    raw_remove(pcb);
+    return 2;
+  }
+  while (!icmpCru::chegou && agoraUs() - t1 < 1000000) delay(1);
+  raw_remove(pcb);
+  if (!icmpCru::chegou) return 1;
+  envioMs = icmpCru::envioMs;
+  t4 = icmpCru::chegadaUs;
+  return 0;
+}
+#else
+int pedirIcmpTimestamp(const IPAddress &ip, uint16_t id, uint16_t seq, uint32_t &envioMs, int64_t &t1, int64_t &t4) {
+  const int s = lwip_socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+  if (s < 0) return 2;
   struct timeval espera = {1, 0};
   lwip_setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &espera, sizeof espera);
-  static uint16_t seq = 0;
-  seq++;
-  const uint16_t id = 0x5153;
   uint8_t pedido[20];
   montarIcmpTimestamp(pedido, id, seq, (uint32_t)(agoraUs() / 1000));
   struct sockaddr_in para;
   memset(&para, 0, sizeof para);
   para.sin_family = AF_INET;
   para.sin_addr.s_addr = (uint32_t)ip;
-  const int64_t t1 = agoraUs();
+  t1 = agoraUs();
   if (lwip_sendto(s, pedido, sizeof pedido, 0, (struct sockaddr *)&para, sizeof para) < 0) {
-    saida.println("nao consegui enviar");
     lwip_close(s);
-    return false;
+    return 2;
   }
-  bool ok = false;
+  int resultado = 1;
   for (;;) {
     uint8_t resp[96];
     struct sockaddr_in de;
     socklen_t tamDe = sizeof de;
     const int n = lwip_recvfrom(s, resp, sizeof resp, 0, (struct sockaddr *)&de, &tamDe);
-    const int64_t t4 = agoraUs();
-    if (n <= 0) {
-      saida.println("sem resposta");
+    t4 = agoraUs();
+    if (n <= 0) break;
+    uint32_t recebMs;
+    if (lerIcmpTimestamp(resp, n, id, seq, recebMs, envioMs)) {
+      resultado = 0;
       break;
     }
-    uint32_t recebMs, envioMs;
-    if (!lerIcmpTimestamp(resp, n, id, seq, recebMs, envioMs)) {
-      if (t4 - t1 > 1500000) {
-        saida.println("sem resposta");
-        break;
-      }
-      continue;  // outro pacote ICMP qualquer (ex.: ping de alguem)
-    }
-    const int64_t rtt = t4 - t1;
-    // hora do dia (UTC) do aparelho ~ no meio do caminho; convertida para MS
-    int64_t localMs = ((int64_t)envioMs + (int64_t)FUSO_MINUTOS * 60000LL) % 86400000LL;
-    if (localMs < 0) localMs += 86400000LL;
-    saida.printf("RESPONDEU  %02ld:%02ld:%02ld,%03ld (hora de MS, sem data; +-%.1f ms)", (long)(localMs / 3600000),
-                 (long)(localMs / 60000 % 60), (long)(localMs / 1000 % 60), (long)(localMs % 1000), rtt / 2000.0);
-    const int m = melhorFonte();
-    if (m >= 0) {
-      const uint32_t melhorMs = (uint32_t)(((agoraUs() + fontes[m].deslocUs) / 1000) % 86400000LL);
-      const int32_t dif = diferencaNoDiaMs(envioMs, melhorMs) + (int32_t)(rtt / 2000);
-      saida.printf("; difere da melhor fonte em %ld ms", (long)dif);
-    }
-    saida.println();
-    ok = true;
-    break;
+    if (t4 - t1 > 1500000) break;  // outro pacote ICMP qualquer (ex.: ping de alguém)
   }
   lwip_close(s);
-  return ok;
+  return resultado;
+}
+#endif
+
+bool sondarIcmpTimestamp(const IPAddress &ip, const char *rotulo) {
+  servicoFundo();
+  saida.printf("  ICMP timestamp %-22s ", rotulo);
+  static uint16_t seq = 0;
+  seq++;
+  uint32_t envioMs = 0;
+  int64_t t1 = 0, t4 = 0;
+  const int r = pedirIcmpTimestamp(ip, 0x5153, seq, envioMs, t1, t4);
+  if (r == 2) {
+    saida.println("nao consegui enviar (ICMP indisponivel neste pacote)");
+    return false;
+  }
+  if (r == 1) {
+    saida.println("sem resposta");
+    return false;
+  }
+  const int64_t rtt = t4 - t1;
+  // hora do dia (UTC) do aparelho ~ no meio do caminho; convertida para MS
+  int64_t localMs = ((int64_t)envioMs + (int64_t)FUSO_MINUTOS * 60000LL) % 86400000LL;
+  if (localMs < 0) localMs += 86400000LL;
+  saida.printf("RESPONDEU  %02ld:%02ld:%02ld,%03ld (hora de MS, sem data; +-%.1f ms)", (long)(localMs / 3600000),
+               (long)(localMs / 60000 % 60), (long)(localMs / 1000 % 60), (long)(localMs % 1000), rtt / 2000.0);
+  const int m = melhorFonte();
+  if (m >= 0) {
+    const uint32_t melhorMs = (uint32_t)(((t4 + fontes[m].deslocUs) / 1000) % 86400000LL);
+    const int32_t dif = diferencaNoDiaMs(envioMs, melhorMs) + (int32_t)(rtt / 2000);
+    saida.printf("; difere da melhor fonte em %ld ms", (long)dif);
+  }
+  saida.println();
+  return true;
 }
 
 // ------------------------------------------------- TIME (37) e DAYTIME (13)
 bool sondarPortaTcp(const IPAddress &ip, uint16_t porta, const char *rotulo) {
+  servicoFundo();
   saida.printf("  TCP %-3u %-30s ", porta, rotulo);
   WiFiClient c;
   const int64_t t1 = agoraUs();
-  if (!c.connect(ip, porta, 1000)) {
+  if (!conectarTcp(c, ip, porta, 1000)) {
     saida.println("fechada ou sem resposta");
     return false;
   }
@@ -121,6 +181,7 @@ bool sondarPortaTcp(const IPAddress &ip, uint16_t porta, const char *rotulo) {
 }
 
 bool sondarTimeUdp(const IPAddress &ip, const char *rotulo) {
+  servicoFundo();
   saida.printf("  UDP 37  %-30s ", rotulo);
   WiFiUDP u;
   if (!u.begin(41037)) {
@@ -154,10 +215,7 @@ bool sondarTimeUdp(const IPAddress &ip, const char *rotulo) {
 }
 
 // ------------------------------------------------- NTP por difusão (só escuta)
-void comecarEscutaNtp() {
-  escutando = escutaNtp.beginMulticast(IPAddress(224, 0, 1, 1), 123) != 0;
-}
-
+// A escuta começa logo depois de conectar (em testar) e é lida aqui.
 void terminarEscutaNtp() {
   saida.print("  NTP por difusao (porta 123, so escutando): ");
   int achou = 0;
