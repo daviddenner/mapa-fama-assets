@@ -17,19 +17,19 @@ void enfileirar(const char *c) {
   if (!strcasecmp(c, "parar")) {  // vale na hora, sem esperar a fila
     if (ocupado) {
       pararPedido = true;
-      saida.println("> parar  (o que estiver rodando termina o passo atual e para)");
+      saida.println(F("> parar  (o que estiver rodando termina o passo atual e para)"));
     } else {
-      saida.println("> parar  (nada em andamento)");
+      saida.println(F("> parar  (nada em andamento)"));
     }
     return;
   }
   if (cmdQtd >= FILA_CMD) {
-    saida.println("(muitos comandos na fila; espere terminar)");
+    saida.println(F("(muitos comandos na fila; espere terminar)"));
     return;
   }
   snprintf(filaCmd[(cmdIni + cmdQtd) % FILA_CMD], sizeof filaCmd[0], "%s", c);
   cmdQtd++;
-  if (ocupado) saida.printf("(comando '%s' na fila: roda quando o atual terminar)\n", c);
+  if (ocupado) SAIDA("(comando '%s' na fila: roda quando o atual terminar)\n", c);
 }
 
 bool tirarDaFila(char *dst, size_t tam) {
@@ -68,7 +68,7 @@ uint32_t relAtual = 0;
 
 void iniciarArquivos() {
   fsOk = montarArquivos();
-  if (!fsOk) saida.println("(sem area de arquivos: rede e relatorios nao serao guardados)");
+  if (!fsOk) saida.println(F("(sem area de arquivos: rede e relatorios nao serao guardados)"));
 }
 
 void nomeRelatorio(uint32_t n, char *dst, size_t tam) { snprintf(dst, tam, "/r%lu.txt", (unsigned long)n); }
@@ -85,7 +85,7 @@ void abrirRelatorio(const char *titulo) {
   nomeRelatorio(relAtual, nome, sizeof nome);
   arqRelatorio = LittleFS.open(nome, "w");
   if (!arqRelatorio) {
-    saida.println("(nao consegui criar o relatorio na memoria)");
+    saida.println(F("(nao consegui criar o relatorio na memoria)"));
     return;
   }
   char hora[48];
@@ -106,7 +106,7 @@ void fecharRelatorio() {
   textoHoraAgora(hora, sizeof hora);
   arqRelatorio.printf("(fim do relatorio %lu: %s)\n", (unsigned long)relAtual, hora);
   arqRelatorio.close();
-  saida.printf("(relatorio %lu guardado na memoria do ESP: comando 'relatorio %lu' ou pela pagina)\n",
+  SAIDA("(relatorio %lu guardado na memoria do ESP: comando 'relatorio %lu' ou pela pagina)\n",
                (unsigned long)relAtual, (unsigned long)relAtual);
 }
 
@@ -141,10 +141,10 @@ void mostrarRelatorio(uint32_t n) {
   File f;
   if (fsOk) f = LittleFS.open(nome, "r");
   if (!f) {
-    saida.printf("Relatorio %lu nao existe. Veja: relatorios\n", (unsigned long)n);
+    SAIDA("Relatorio %lu nao existe. Veja: relatorios\n", (unsigned long)n);
     return;
   }
-  saida.printf("\n======== inicio do relatorio %lu ========\n", (unsigned long)n);
+  SAIDA("\n======== inicio do relatorio %lu ========\n", (unsigned long)n);
   char bloco[256];
   while (f.available()) {
     const size_t k = f.read((uint8_t *)bloco, sizeof bloco);
@@ -153,13 +153,13 @@ void mostrarRelatorio(uint32_t n) {
     servicoFundo();
   }
   f.close();
-  saida.printf("======== fim do relatorio %lu ========\n", (unsigned long)n);
+  SAIDA("======== fim do relatorio %lu ========\n", (unsigned long)n);
 }
 
 void apagarRelatorios() {
   if (!fsOk) return;
   if (arqRelatorio) {
-    saida.println("Espere o teste terminar para apagar os relatorios.");
+    saida.println(F("Espere o teste terminar para apagar os relatorios."));
     return;
   }
   const uint32_t ultimo = prefs.getUInt("nrel", 0);
@@ -168,7 +168,7 @@ void apagarRelatorios() {
     nomeRelatorio(n, nome, sizeof nome);
     LittleFS.remove(nome);
   }
-  saida.println("Relatorios apagados.");
+  saida.println(F("Relatorios apagados."));
 }
 
 // ------------------------------------------------------------ página
@@ -231,7 +231,7 @@ void receberComando() {
 
 void receberRede() {
   if (ocupado) {
-    saida.println("(pagina: espere o teste terminar para mudar a rede)");
+    saida.println(F("(pagina: espere o teste terminar para mudar a rede)"));
     servidor.send(409, "text/plain", "ocupado");
     return;
   }
@@ -239,7 +239,7 @@ void receberRede() {
     snprintf(rede, sizeof rede, "%s", servidor.arg("rede").c_str());
     snprintf(senha, sizeof senha, "%s", servidor.arg("senha").c_str());
     salvarRede();
-    saida.printf("Pela pagina: rede \"%s\" (%s) salva.\n", rede, senha[0] ? "com senha" : "aberta");
+    SAIDA("Pela pagina: rede \"%s\" (%s) salva.\n", rede, senha[0] ? "com senha" : "aberta");
   }
   if (servidor.hasArg("potencia")) definirPotencia(servidor.arg("potencia").c_str());
   servidor.send(200, "text/plain", "ok");
@@ -337,15 +337,15 @@ void atualizarBotoes() {
     if (ocupado) {
       enfileirar("parar");
     } else {
-      saida.println("(botao FLASH/BOOT apertado: testar)");
+      saida.println(F("(botao FLASH/BOOT apertado: testar)"));
       enfileirar("testar");
     }
   }
   if (botaoRele.apertou()) {
     if (ocupado) {
-      saida.println("(botao S1: espere o teste terminar para testar o rele)");
+      saida.println(F("(botao S1: espere o teste terminar para testar o rele)"));
     } else {
-      saida.println("(botao S1 apertado: rele)");
+      saida.println(F("(botao S1 apertado: rele)"));
       enfileirar("rele");
     }
   }

@@ -4,6 +4,8 @@
 #pragma once
 #include <Arduino.h>
 
+#include <memory>
+
 #include "analise.h"
 
 #if defined(ESP8266)
@@ -76,18 +78,25 @@ inline bool conectarTcp(WiFiClient &c, const char *host, uint16_t porta, uint32_
   return c.connect(host, porta);
 }
 
-// HTTPS só para ler o cabeçalho. O ESP8266 precisa de ~22 KB livres para o
-// HTTPS normal; com menos, tenta blocos pequenos (se o servidor aceitar).
-inline bool conectarTls(WiFiClientSecure &s, const char *host, uint16_t porta, const char *&erro) {
+// HTTPS só para ler o cabeçalho. No ESP8266 o HTTPS normal pede ~28 KB livres
+// (6 KB só para criar o cliente); com menos, tenta blocos pequenos (~13 KB), se
+// o servidor aceitar. Sem memória, pula: faltar memória aqui reiniciaria o ESP.
+inline bool memoriaParaTls(const char *host, uint16_t porta, bool &pequenos, const char *&erro) {
+  pequenos = false;
+  if (ESP.getFreeHeap() >= 30000 && ESP.getMaxFreeBlockSize() >= 18000) return true;
+  if (ESP.getFreeHeap() >= 16000 && ESP.getMaxFreeBlockSize() >= 7000 &&
+      WiFiClientSecure::probeMaxFragmentLength(host, porta, 1024)) {
+    pequenos = true;
+    return true;
+  }
+  erro = "pouca memoria livre para HTTPS neste chip (pulei)";
+  return false;
+}
+
+inline bool conectarTls(WiFiClientSecure &s, const char *host, uint16_t porta, bool pequenos, const char *&erro) {
   s.setInsecure();
   s.setTimeout(8000);
-  if (ESP.getFreeHeap() < 30000 || ESP.getMaxFreeBlockSize() < 18000) {
-    if (!WiFiClientSecure::probeMaxFragmentLength(host, porta, 1024)) {
-      erro = "pouca memoria livre para HTTPS neste chip (pulei)";
-      return false;
-    }
-    s.setBufferSizes(1024, 1024);
-  }
+  if (pequenos) s.setBufferSizes(1024, 1024);
   if (!s.connect(host, porta)) {
     erro = "nao conectou (porta 443 bloqueada ou falha no TLS)";
     return false;
@@ -152,7 +161,12 @@ inline bool conectarTcp(WiFiClient &c, const char *host, uint16_t porta, uint32_
   return c.connect(host, porta, ms);
 }
 
-inline bool conectarTls(WiFiClientSecure &s, const char *host, uint16_t porta, const char *&erro) {
+inline bool memoriaParaTls(const char *, uint16_t, bool &pequenos, const char *&) {
+  pequenos = false;
+  return true;
+}
+
+inline bool conectarTls(WiFiClientSecure &s, const char *host, uint16_t porta, bool, const char *&erro) {
   s.setInsecure();  // só lemos o cabeçalho; não enviamos dado nenhum
   s.setHandshakeTimeout(8);
   if (!s.connect(host, porta, 6000)) {

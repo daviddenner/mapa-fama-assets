@@ -101,31 +101,31 @@ int pedirIcmpTimestamp(const IPAddress &ip, uint16_t id, uint16_t seq, uint32_t 
 
 bool sondarIcmpTimestamp(const IPAddress &ip, const char *rotulo) {
   servicoFundo();
-  saida.printf("  ICMP timestamp %-22s ", rotulo);
+  SAIDA("  ICMP timestamp %-22s ", rotulo);
   static uint16_t seq = 0;
   seq++;
   uint32_t envioMs = 0;
   int64_t t1 = 0, t4 = 0;
   const int r = pedirIcmpTimestamp(ip, 0x5153, seq, envioMs, t1, t4);
   if (r == 2) {
-    saida.println("nao consegui enviar (ICMP indisponivel neste pacote)");
+    saida.println(F("nao consegui enviar (ICMP indisponivel neste pacote)"));
     return false;
   }
   if (r == 1) {
-    saida.println("sem resposta");
+    saida.println(F("sem resposta"));
     return false;
   }
   const int64_t rtt = t4 - t1;
   // hora do dia (UTC) do aparelho ~ no meio do caminho; convertida para MS
   int64_t localMs = ((int64_t)envioMs + (int64_t)FUSO_MINUTOS * 60000LL) % 86400000LL;
   if (localMs < 0) localMs += 86400000LL;
-  saida.printf("RESPONDEU  %02ld:%02ld:%02ld,%03ld (hora de MS, sem data; +-%.1f ms)", (long)(localMs / 3600000),
+  SAIDA("RESPONDEU  %02ld:%02ld:%02ld,%03ld (hora de MS, sem data; +-%.1f ms)", (long)(localMs / 3600000),
                (long)(localMs / 60000 % 60), (long)(localMs / 1000 % 60), (long)(localMs % 1000), rtt / 2000.0);
   const int m = melhorFonte();
   if (m >= 0) {
     const uint32_t melhorMs = (uint32_t)(((t4 + fontes[m].deslocUs) / 1000) % 86400000LL);
     const int32_t dif = diferencaNoDiaMs(envioMs, melhorMs) + (int32_t)(rtt / 2000);
-    saida.printf("; difere da melhor fonte em %ld ms", (long)dif);
+    SAIDA("; difere da melhor fonte em %ld ms", (long)dif);
   }
   saida.println();
   return true;
@@ -134,11 +134,11 @@ bool sondarIcmpTimestamp(const IPAddress &ip, const char *rotulo) {
 // ------------------------------------------------- TIME (37) e DAYTIME (13)
 bool sondarPortaTcp(const IPAddress &ip, uint16_t porta, const char *rotulo) {
   servicoFundo();
-  saida.printf("  TCP %-3u %-30s ", porta, rotulo);
+  SAIDA("  TCP %-3u %-30s ", porta, rotulo);
   WiFiClient c;
   const int64_t t1 = agoraUs();
   if (!conectarTcp(c, ip, porta, 1000)) {
-    saida.println("fechada ou sem resposta");
+    saida.println(F("fechada ou sem resposta"));
     return false;
   }
   uint8_t b[64];
@@ -157,18 +157,18 @@ bool sondarPortaTcp(const IPAddress &ip, uint16_t porta, const char *rotulo) {
   const int64_t t4 = agoraUs();
   c.stop();
   if (n == 0) {
-    saida.println("conectou, mas nao mandou nada");
+    saida.println(F("conectou, mas nao mandou nada"));
     return false;
   }
   if (porta == 37) {
     if (n < 4) {
-      saida.println("resposta curta demais");
+      saida.println(F("resposta curta demais"));
       return false;
     }
     const int64_t desloc = (int64_t)epochDoTime868(b) * 1000000LL - (t1 + t4) / 2;
-    saida.print("RESPONDEU  ");
+    saida.print(F("RESPONDEU  "));
     imprimirHora(desloc);
-    saida.println(" (+-0,5 s)");
+    saida.println(F(" (+-0,5 s)"));
     char nome[72];
     snprintf(nome, sizeof nome, "TIME (porta 37) %s", rotulo);
     adicionarFonte(nome, TEMPO_ANTIGO, desloc, 500000 + (t4 - t1) / 2, (uint32_t)ip);
@@ -176,16 +176,16 @@ bool sondarPortaTcp(const IPAddress &ip, uint16_t porta, const char *rotulo) {
   }
   b[n] = 0;
   while (n && (b[n - 1] == '\r' || b[n - 1] == '\n')) b[--n] = 0;
-  saida.printf("RESPONDEU  \"%s\"\n", (char *)b);
+  SAIDA("RESPONDEU  \"%s\"\n", (char *)b);
   return true;
 }
 
 bool sondarTimeUdp(const IPAddress &ip, const char *rotulo) {
   servicoFundo();
-  saida.printf("  UDP 37  %-30s ", rotulo);
+  SAIDA("  UDP 37  %-30s ", rotulo);
   WiFiUDP u;
   if (!u.begin(41037)) {
-    saida.println("erro ao abrir UDP");
+    saida.println(F("erro ao abrir UDP"));
     return false;
   }
   u.beginPacket(ip, 37);
@@ -199,9 +199,9 @@ bool sondarTimeUdp(const IPAddress &ip, const char *rotulo) {
       u.read(b, 4);
       u.stop();
       const int64_t desloc = (int64_t)epochDoTime868(b) * 1000000LL - (t1 + t4) / 2;
-      saida.print("RESPONDEU  ");
+      saida.print(F("RESPONDEU  "));
       imprimirHora(desloc);
-      saida.println(" (+-0,5 s)");
+      saida.println(F(" (+-0,5 s)"));
       char nome[72];
       snprintf(nome, sizeof nome, "TIME (UDP 37) %s", rotulo);
       adicionarFonte(nome, TEMPO_ANTIGO, desloc, 500000 + (t4 - t1) / 2, (uint32_t)ip);
@@ -210,14 +210,14 @@ bool sondarTimeUdp(const IPAddress &ip, const char *rotulo) {
     delay(1);
   }
   u.stop();
-  saida.println("sem resposta");
+  saida.println(F("sem resposta"));
   return false;
 }
 
 // ------------------------------------------------- NTP por difusão (só escuta)
 // A escuta começa logo depois de conectar (em testar) e é lida aqui.
 void terminarEscutaNtp() {
-  saida.print("  NTP por difusao (porta 123, so escutando): ");
+  saida.print(F("  NTP por difusao (porta 123, so escutando): "));
   int achou = 0;
   if (escutando) {
     while (escutaNtp.parsePacket() > 0) {
@@ -225,7 +225,7 @@ void terminarEscutaNtp() {
       const int n = escutaNtp.read(b, sizeof b);
       if (n < 48) continue;
       const uint8_t modo = b[0] & 7;
-      saida.printf("\n      pacote de %s, modo %u%s, estrato %u", txtIp(escutaNtp.remoteIP()), modo,
+      SAIDA("\n      pacote de %s, modo %u%s, estrato %u", txtIp(escutaNtp.remoteIP()), modo,
                    modo == 5 ? " (difusao)" : "", b[1]);
       achou++;
     }
@@ -233,8 +233,8 @@ void terminarEscutaNtp() {
     escutando = false;
   }
   if (achou) {
-    saida.println("\n      (ha um servidor anunciando a hora para a rede toda)");
+    saida.println(F("\n      (ha um servidor anunciando a hora para a rede toda)"));
   } else {
-    saida.println("nada chegou durante o teste (normal: poucas redes usam)");
+    saida.println(F("nada chegou durante o teste (normal: poucas redes usam)"));
   }
 }

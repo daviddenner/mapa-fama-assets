@@ -72,6 +72,8 @@
 
 // ------------------------------------------------------------------ Estado
 Registro saida;  // tudo o que o teste mostra: monitor serial + página + relatórios
+// Mensagens com o formato na flash (no ESP8266 a RAM é pouca): SAIDA("...", ...)
+#define SAIDA(formato, ...) saida.printfP(PSTR(formato), ##__VA_ARGS__)
 Preferences prefs;
 ServidorWeb servidor(80);
 char rede[33] = "";
@@ -128,21 +130,21 @@ bool ehPrivado(const IPAddress &ip) { return ipPrivado(ip[0], ip[1]); }
 
 void titulo(const char *t) {
   servicoFundo();
-  saida.printf("\n---- %s ----\n", t);
+  SAIDA("\n---- %s ----\n", t);
 }
 
 void imprimirMs(int64_t us) {
   if (us < 10000) {
-    saida.printf("%.1f ms", us / 1000.0);
+    SAIDA("%.1f ms", us / 1000.0);
   } else {
-    saida.printf("%lld ms", (long long)(us / 1000));
+    SAIDA("%lld ms", (long long)(us / 1000));
   }
 }
 
 void imprimirHora(int64_t deslocUs) {
   const int64_t ms = (agoraUs() + deslocUs) / 1000;  // ms desde 1970 (UTC)
   const DataHora t = deEpoch((uint32_t)(ms / 1000) + FUSO_MINUTOS * 60);
-  saida.printf("%02u/%02u/%04u %02u:%02u:%02u,%03u", t.dia, t.mes, t.ano, t.hora, t.min, t.seg, (unsigned)(ms % 1000));
+  SAIDA("%02u/%02u/%04u %02u:%02u:%02u,%03u", t.dia, t.mes, t.ano, t.hora, t.min, t.seg, (unsigned)(ms % 1000));
 }
 
 // Hora entre 2024 e 2100? (aparelho com relógio desacertado informa 2000, 1970...)
@@ -153,7 +155,7 @@ bool horaPlausivel(int64_t deslocUs) {
 
 void adicionarFonte(const char *nome, int tipo, int64_t desloc, int64_t incerteza, uint32_t ip) {
   if (!horaPlausivel(desloc)) {
-    saida.println("      (hora absurda: o relogio desse aparelho esta desacertado; ignorada)");
+    saida.println(F("      (hora absurda: o relogio desse aparelho esta desacertado; ignorada)"));
     return;
   }
   if (nFontes >= sizeof(fontes) / sizeof(fontes[0])) return;
@@ -202,12 +204,12 @@ const char *textoConclusao(uint8_t c) {
 }
 
 void mostrarMac() {
-  saida.printf("MAC deste %s: %s   <- e este que a TI cadastra\n", NOME_CHIP, WiFi.macAddress().c_str());
-  saida.printf("Nome na rede:    %s\n", NOME_NA_REDE);
+  SAIDA("MAC deste %s: %s   <- e este que a TI cadastra\n", NOME_CHIP, WiFi.macAddress().c_str());
+  SAIDA("Nome na rede:    %s\n", NOME_NA_REDE);
 }
 
 void mostrarComoAcessar() {
-  saida.printf("Pagina deste teste: Wi-Fi \"%s\" (senha %s) -> http://%s/\n", AP_TESTE_NOME, AP_TESTE_SENHA,
+  SAIDA("Pagina deste teste: Wi-Fi \"%s\" (senha %s) -> http://%s/\n", AP_TESTE_NOME, AP_TESTE_SENHA,
                txtIp(WiFi.softAPIP()));
 }
 
@@ -236,13 +238,13 @@ void definirPotencia(const char *texto) {
   } else if (!strcmp(texto, "15")) {
     nova = 30;
   } else {
-    saida.println("Uso: potencia max | 8.5 | 11 | 15");
+    saida.println(F("Uso: potencia max | 8.5 | 11 | 15"));
     return;
   }
   potencia = nova;
   prefs.putUChar("pot", potencia);
   aplicarPotencia();
-  saida.printf("Potencia do Wi-Fi: %s (salva).\n", textoPotencia());
+  SAIDA("Potencia do Wi-Fi: %s (salva).\n", textoPotencia());
 }
 
 // ============================================================ Wi-Fi
@@ -288,7 +290,7 @@ void imprimirQuedas() {
     filaIni = filaIni + 1;
     res.quedas++;
     res.ultimoMotivo = m;
-    saida.printf("  recusado/desconectado: codigo %u = %s\n", m, motivoQueda(m));
+    SAIDA("  recusado/desconectado: codigo %u = %s\n", m, motivoQueda(m));
   }
 }
 
@@ -303,8 +305,8 @@ void desconectar() {
 bool tentarConectar() {
   desconectar();
   pedirNtpAoDhcp();
-  saida.printf("Conectando em \"%s\" (%s, potencia %s)...\n", rede, senha[0] ? "com senha" : "rede aberta", textoPotencia());
-  saida.println("  (enquanto conecta, a pagina pode ficar alguns segundos sem responder)");
+  SAIDA("Conectando em \"%s\" (%s, potencia %s)...\n", rede, senha[0] ? "com senha" : "rede aberta", textoPotencia());
+  saida.println(F("  (enquanto conecta, a pagina pode ficar alguns segundos sem responder)"));
   if (senha[0]) {
     WiFi.begin((const char *)rede, (const char *)senha);
   } else {
@@ -319,26 +321,26 @@ bool tentarConectar() {
     if (evAssociou && !avisouAssociou) {
       avisouAssociou = true;
       res.associou = true;
-      saida.printf("  associou ao roteador em %.1f s; esperando o IP (DHCP)...\n", (millis() - inicio) / 1000.0);
+      SAIDA("  associou ao roteador em %.1f s; esperando o IP (DHCP)...\n", (millis() - inicio) / 1000.0);
       limite = millis() + 15000;  // mais 15 s para receber o IP
     }
     if (evTemIP) {
       res.associou = true;
       res.temIP = true;
       res.ip = (uint32_t)WiFi.localIP();
-      saida.printf("  CONECTADO em %.1f s, IP %s\n", (millis() - inicio) / 1000.0, txtIp(WiFi.localIP()));
+      SAIDA("  CONECTADO em %.1f s, IP %s\n", (millis() - inicio) / 1000.0, txtIp(WiFi.localIP()));
       return true;
     }
     pausa(50);
   }
   imprimirQuedas();
   if (res.associou) {
-    saida.println("  FALHOU: associou ao roteador, mas o DHCP nao entregou IP.");
-    saida.println("  (provavel: a rede so entrega IP para MAC cadastrado)");
+    saida.println(F("  FALHOU: associou ao roteador, mas o DHCP nao entregou IP."));
+    saida.println(F("  (provavel: a rede so entrega IP para MAC cadastrado)"));
   } else if (res.quedas) {
-    saida.printf("  FALHOU: o roteador recusou. Ultimo codigo %d = %s\n", res.ultimoMotivo, motivoQueda(res.ultimoMotivo));
+    SAIDA("  FALHOU: o roteador recusou. Ultimo codigo %d = %s\n", res.ultimoMotivo, motivoQueda(res.ultimoMotivo));
   } else {
-    saida.println("  FALHOU: sem resposta do roteador (rede fora de alcance?)");
+    saida.println(F("  FALHOU: sem resposta do roteador (rede fora de alcance?)"));
   }
   return false;
 }
@@ -355,12 +357,12 @@ bool conectar() {
   if (tentarConectar()) return true;
   if (potencia == 0 && !potenciaTentada && pareceProblemaDeRadio()) {
     potenciaTentada = true;
-    saida.println("  Tentando de novo com menos potencia de Wi-Fi (placas com antena ruim costumam precisar)...");
+    saida.println(F("  Tentando de novo com menos potencia de Wi-Fi (placas com antena ruim costumam precisar)..."));
     potencia = 17;
     const bool ok = tentarConectar();
     if (ok) {
       prefs.putUChar("pot", potencia);
-      saida.println("  Funcionou com 8,5 dBm: potencia salva ('potencia max' desfaz).");
+      saida.println(F("  Funcionou com 8,5 dBm: potencia salva ('potencia max' desfaz)."));
     } else {
       potencia = 0;
       aplicarPotencia();
@@ -372,16 +374,16 @@ bool conectar() {
 
 void mostrarInfo() {
   if (WiFi.status() != WL_CONNECTED) {
-    saida.println("Nao conectado.");
+    saida.println(F("Nao conectado."));
     return;
   }
-  saida.printf("  IP do ESP ........ %s\n", txtIp(WiFi.localIP()));
-  saida.printf("  Mascara .......... %s\n", txtIp(WiFi.subnetMask()));
-  saida.printf("  Roteador ......... %s\n", txtIp(WiFi.gatewayIP()));
-  saida.printf("  DNS .............. %s  %s\n", txtIp(WiFi.dnsIP(0)), txtIp(WiFi.dnsIP(1)));
+  SAIDA("  IP do ESP ........ %s\n", txtIp(WiFi.localIP()));
+  SAIDA("  Mascara .......... %s\n", txtIp(WiFi.subnetMask()));
+  SAIDA("  Roteador ......... %s\n", txtIp(WiFi.gatewayIP()));
+  SAIDA("  DNS .............. %s  %s\n", txtIp(WiFi.dnsIP(0)), txtIp(WiFi.dnsIP(1)));
   const IPAddress n = ntpInformadoPeloDhcp();
-  saida.printf("  NTP do DHCP ...... %s\n", ipVazio(n) ? "nenhum informado" : txtIp(n));
-  saida.printf("  Sinal ............ %d dBm, canal %ld, roteador %s\n", (int)WiFi.RSSI(), (long)WiFi.channel(),
+  SAIDA("  NTP do DHCP ...... %s\n", ipVazio(n) ? "nenhum informado" : txtIp(n));
+  SAIDA("  Sinal ............ %d dBm, canal %ld, roteador %s\n", (int)WiFi.RSSI(), (long)WiFi.channel(),
                WiFi.BSSIDstr().c_str());
 }
 
@@ -403,16 +405,16 @@ void procurarRedes() {
         ordem[i] = ordem[j];
         ordem[j] = t;
       }
-  saida.println("  sinal  canal  seguranca                   nome");
+  saida.println(F("  sinal  canal  seguranca                   nome"));
   for (int i = 0; i < total; i++) {
     const int k = ordem[i];
     const String nome = WiFi.SSID(k);
-    saida.printf("  %4ld   %4ld   %-26s  %s%s\n", (long)WiFi.RSSI(k), (long)WiFi.channel(k), segurancaDaRede(k),
+    SAIDA("  %4ld   %4ld   %-26s  %s%s\n", (long)WiFi.RSSI(k), (long)WiFi.channel(k), segurancaDaRede(k),
                  nome.length() ? nome.c_str() : "(oculta)",
                  (rede[0] && strcmp(nome.c_str(), rede) == 0) ? "   <- escolhida" : "");
   }
   WiFi.scanDelete();
-  saida.println("  Para escolher: rede NOME");
+  saida.println(F("  Para escolher: rede NOME"));
 }
 
 // ============================================================ DNS
@@ -421,11 +423,11 @@ bool resolver(const char *nome, IPAddress &ip, bool imprimir) {
   const bool ok = WiFi.hostByName(nome, ip) == 1 && !ipVazio(ip);
   if (imprimir) {
     if (ok) {
-      saida.printf("  %-30s -> %s", nome, txtIp(ip));
-      if (ehPrivado(ip)) saida.print("  (IP interno!)");
-      saida.printf("  em %lld ms\n", (long long)((agoraUs() - t0) / 1000));
+      SAIDA("  %-30s -> %s", nome, txtIp(ip));
+      if (ehPrivado(ip)) saida.print(F("  (IP interno!)"));
+      SAIDA("  em %lld ms\n", (long long)((agoraUs() - t0) / 1000));
     } else {
-      saida.printf("  %-30s -> nao resolveu\n", nome);
+      SAIDA("  %-30s -> nao resolveu\n", nome);
     }
   }
   return ok;
@@ -478,29 +480,29 @@ bool ntpBruto(const IPAddress &ip, int64_t &desloc, int64_t &atraso, RespostaNtp
 // Pergunta a hora a um servidor NTP e mostra o resultado.
 bool consultarNtp(const IPAddress &ip, const char *rotulo, bool guardar) {
   servicoFundo();
-  saida.printf("  %-36s ", rotulo);
+  SAIDA("  %-36s ", rotulo);
   int64_t desloc, atraso;
   RespostaNtp r;
   int problema;
   if (!ntpBruto(ip, desloc, atraso, r, problema)) {
     if (problema == -1) {
-      saida.println("erro ao abrir UDP");
+      saida.println(F("erro ao abrir UDP"));
     } else if (problema == -2) {
-      saida.println("nao consegui enviar");
+      saida.println(F("nao consegui enviar"));
     } else if (problema > 0) {
       saida.println(textoProblemaNtp(problema));
     } else {
-      saida.println("sem resposta");
+      saida.println(F("sem resposta"));
     }
     return false;
   }
   char ref[20];
   textoRefid(r, ref, sizeof ref);
-  saida.print("RESPONDEU  ");
+  saida.print(F("RESPONDEU  "));
   imprimirHora(desloc);
-  saida.print("  (+-");
+  saida.print(F("  (+-"));
   imprimirMs(atraso / 2);
-  saida.printf(", estrato %u, ref %s)\n", r.estrato, ref);
+  SAIDA(", estrato %u, ref %s)\n", r.estrato, ref);
   if (guardar) {
     char nome[72];
     snprintf(nome, sizeof nome, "NTP %s", rotulo);
@@ -521,11 +523,14 @@ bool pedirHttp(const char *url, RespostaHttp &r, AmostraData &amostra, bool lerT
     return false;
   }
   WiFiClient simples;
-  WiFiClientSecure seguro;
+  std::unique_ptr<WiFiClientSecure> seguro;  // só é criado para https (no ESP8266 ele reserva ~6 KB)
   Client *c;
   if (u.https) {
-    if (!conectarTls(seguro, u.host, u.porta, erro)) return false;
-    c = &seguro;
+    bool blocosPequenos = false;
+    if (!memoriaParaTls(u.host, u.porta, blocosPequenos, erro)) return false;
+    seguro.reset(new WiFiClientSecure());
+    if (!conectarTls(*seguro, u.host, u.porta, blocosPequenos, erro)) return false;
+    c = seguro.get();
   } else {
     if (!conectarTcp(simples, u.host, u.porta, 4000)) {
       erro = "nao conectou";
@@ -606,31 +611,31 @@ bool pedirHttp(const char *url, RespostaHttp &r, AmostraData &amostra, bool lerT
 // Mostra o resultado de um pedido HTTP e guarda a hora do Date como fonte.
 bool testarPagina(const char *url, bool guardar) {
   servicoFundo();
-  saida.printf("  %s\n", url);
+  SAIDA("  %s\n", url);
   static RespostaHttp r;
   AmostraData a;
   const char *erro;
   if (!pedirHttp(url, r, a, true, erro)) {
-    saida.printf("      -> %s\n", erro);
+    SAIDA("      -> %s\n", erro);
     return false;
   }
   if (r.status < 0) {
-    saida.println("      -> respondeu, mas nao e HTTP");
+    saida.println(F("      -> respondeu, mas nao e HTTP"));
     return true;
   }
-  saida.printf("      -> status %d em %lld ms", r.status, (long long)((a.recebUs - a.envioUs) / 1000));
-  if (r.servidor[0]) saida.printf(", servidor \"%s\"", r.servidor);
+  SAIDA("      -> status %d em %lld ms", r.status, (long long)((a.recebUs - a.envioUs) / 1000));
+  if (r.servidor[0]) SAIDA(", servidor \"%s\"", r.servidor);
   saida.println();
-  if (r.local[0]) saida.printf("      -> redireciona para: %s\n", r.local);
-  if (r.titulo[0]) saida.printf("      -> titulo da pagina: \"%s\"\n", r.titulo);
+  if (r.local[0]) SAIDA("      -> redireciona para: %s\n", r.local);
+  if (r.titulo[0]) SAIDA("      -> titulo da pagina: \"%s\"\n", r.titulo);
   if (r.data[0]) {
-    saida.printf("      -> Date: %s", r.data);
+    SAIDA("      -> Date: %s", r.data);
     if (r.temData) {
       int64_t desloc, incerteza;
       deslocDeUmaAmostra(a, desloc, incerteza);
-      saida.print("  = ");
+      saida.print(F("  = "));
       imprimirHora(desloc);
-      saida.println(" (hora de MS, +-0,5 s)");
+      saida.println(F(" (hora de MS, +-0,5 s)"));
       if (guardar) {
         char nome[72];
         snprintf(nome, sizeof nome, "Date de %s", url);
@@ -638,10 +643,10 @@ bool testarPagina(const char *url, bool guardar) {
         if (!res.urlData[0] && strncasecmp(url, "http://", 7) == 0) snprintf(res.urlData, sizeof res.urlData, "%s", url);
       }
     } else {
-      saida.println("  (formato nao reconhecido)");
+      saida.println(F("  (formato nao reconhecido)"));
     }
   } else {
-    saida.println("      -> sem cabecalho Date");
+    saida.println(F("      -> sem cabecalho Date"));
   }
 
   // Classificação: internet liberada ou página de login no caminho?
@@ -670,7 +675,7 @@ void refinarData(const char *url) {
   AmostraData ant, at;
   int pedidos = 1;
   if (!amostrarData(url, ant)) {
-    saida.println("  a pagina parou de responder");
+    saida.println(F("  a pagina parou de responder"));
     return;
   }
   bool virou = false;
@@ -686,7 +691,7 @@ void refinarData(const char *url) {
     ant = at;
   }
   if (!virou) {
-    saida.printf("  nao deu (%d pedidos sem pegar a virada do segundo)\n", pedidos);
+    SAIDA("  nao deu (%d pedidos sem pegar a virada do segundo)\n", pedidos);
     return;
   }
   AmostraData par[2] = {ant, at};
@@ -718,11 +723,11 @@ void refinarData(const char *url) {
       incerteza = i2;
     }
   }
-  saida.printf("  %d pedidos; virada do segundo achada: ", pedidos);
+  SAIDA("  %d pedidos; virada do segundo achada: ", pedidos);
   imprimirHora(desloc);
-  saida.print(" (+-");
+  saida.print(F(" (+-"));
   imprimirMs(incerteza);
-  saida.println(")");
+  saida.println(F(")"));
   char nome[72];
   snprintf(nome, sizeof nome, "Date refinado de %s", url);
   adicionarFonte(nome, DATE_PAGINA, desloc, incerteza, 0);
@@ -756,87 +761,87 @@ uint8_t calcularConclusao() {
 
 void imprimirResumo() {
   saida.println();
-  saida.println("==================== RESUMO ====================");
+  saida.println(F("==================== RESUMO ===================="));
   if (!res.rodou) {
-    saida.println("Nenhum teste feito ainda. Digite: testar");
+    saida.println(F("Nenhum teste feito ainda. Digite: testar"));
     return;
   }
   mostrarMac();
-  saida.printf("Rede: \"%s\" (%s), potencia %s\n", rede, senha[0] ? "com senha" : "aberta", textoPotencia());
+  SAIDA("Rede: \"%s\" (%s), potencia %s\n", rede, senha[0] ? "com senha" : "aberta", textoPotencia());
   if (res.temIP) {
-    saida.printf("Wi-Fi ............ CONECTOU (IP %s)\n", txtIp(IPAddress(res.ip)));
+    SAIDA("Wi-Fi ............ CONECTOU (IP %s)\n", txtIp(IPAddress(res.ip)));
   } else if (res.associou) {
-    saida.println("Wi-Fi ............ associou, mas NAO recebeu IP (DHCP)");
+    saida.println(F("Wi-Fi ............ associou, mas NAO recebeu IP (DHCP)"));
   } else {
-    saida.printf("Wi-Fi ............ RECUSADO (codigo %d = %s)\n", res.ultimoMotivo, motivoQueda(res.ultimoMotivo));
+    SAIDA("Wi-Fi ............ RECUSADO (codigo %d = %s)\n", res.ultimoMotivo, motivoQueda(res.ultimoMotivo));
   }
   if (res.temIP) {
-    saida.printf("Internet ......... %s\n", res.internet ? "LIBERADA" : "bloqueada (falta login/cadastro)");
-    if (res.portal[0]) saida.printf("Pagina de login .. %s\n", res.portal);
-    saida.printf("DNS .............. %s\n",
+    SAIDA("Internet ......... %s\n", res.internet ? "LIBERADA" : "bloqueada (falta login/cadastro)");
+    if (res.portal[0]) SAIDA("Pagina de login .. %s\n", res.portal);
+    SAIDA("DNS .............. %s\n",
                  res.dnsOk ? (res.dnsDesviado ? "responde, mas desviado para IP interno" : "funciona") : "nao responde");
   }
   resumoPlaca();
-  saida.println("Fontes de hora que funcionaram:");
+  saida.println(F("Fontes de hora que funcionaram:"));
   const int m = melhorFonte();
-  if (m < 0) saida.println("  nenhuma");
+  if (m < 0) saida.println(F("  nenhuma"));
   for (int i = 0; i < nFontes; i++) {
     const Fonte &f = fontes[i];
-    saida.printf("  %-58s +-", f.nome);
+    SAIDA("  %-58s +-", f.nome);
     imprimirMs(f.incertezaUs);
     if (i != m) {
       const int64_t dif = f.deslocUs - fontes[m].deslocUs;
-      saida.print(", difere da melhor em ");
+      saida.print(F(", difere da melhor em "));
       imprimirMs(llabs(dif));
       if (llabs(dif) > 2000000 && llabs(dif) > 2 * f.incertezaUs)
         saida.print(dif > 0 ? " (relogio dessa fonte ADIANTADO)" : " (relogio dessa fonte ATRASADO)");
     } else {
-      saida.print("   <- melhor");
+      saida.print(F("   <- melhor"));
     }
     saida.println();
   }
   if (m >= 0) {
-    saida.print("Hora agora (melhor fonte): ");
+    saida.print(F("Hora agora (melhor fonte): "));
     imprimirHora(fontes[m].deslocUs);
-    saida.println(" (MS)");
+    saida.println(F(" (MS)"));
   }
 
   conclusao = calcularConclusao();
   saida.println();
-  saida.printf("CONCLUSAO (%u): ", conclusao);
+  SAIDA("CONCLUSAO (%u): ", conclusao);
   switch (conclusao) {
     case 6:
-      saida.println("sem IP nao ha como pegar a hora pela rede.");
-      saida.println("  Peca a TI o cadastro do MAC acima, ou use o sino com GPS.");
+      saida.println(F("sem IP nao ha como pegar a hora pela rede."));
+      saida.println(F("  Peca a TI o cadastro do MAC acima, ou use o sino com GPS."));
       break;
     case 1:
-      saida.println("a internet esta LIBERADA para este aparelho (MAC cadastrado ou rede aberta).");
-      saida.println("  Qualquer servidor de hora funciona enquanto o cadastro existir.");
-      saida.println("  Para saber o que funciona SEM cadastro, repita o teste com o MAC fora da lista.");
+      saida.println(F("a internet esta LIBERADA para este aparelho (MAC cadastrado ou rede aberta)."));
+      saida.println(F("  Qualquer servidor de hora funciona enquanto o cadastro existir."));
+      saida.println(F("  Para saber o que funciona SEM cadastro, repita o teste com o MAC fora da lista."));
       break;
     case 2:
-      saida.println("DA PARA USAR: um servidor de hora da propria rede responde mesmo SEM login.");
-      saida.println("  O sino ja tenta esses servidores primeiro (com o DS3231 de reserva).");
+      saida.println(F("DA PARA USAR: um servidor de hora da propria rede responde mesmo SEM login."));
+      saida.println(F("  O sino ja tenta esses servidores primeiro (com o DS3231 de reserva)."));
       break;
     case 3:
-      saida.println("o NTP da internet responde mesmo SEM login (porta 123 liberada).");
-      saida.println("  Funciona, mas a TI pode fechar isso a qualquer momento.");
+      saida.println(F("o NTP da internet responde mesmo SEM login (porta 123 liberada)."));
+      saida.println(F("  Funciona, mas a TI pode fechar isso a qualquer momento."));
       break;
     case 4:
-      saida.println("so as paginas informam a hora (cabecalho Date), mesmo sem login.");
-      saida.println("  Da para usar, com a precisao mostrada acima; e o metodo mais fragil.");
+      saida.println(F("so as paginas informam a hora (cabecalho Date), mesmo sem login."));
+      saida.println(F("  Da para usar, com a precisao mostrada acima; e o metodo mais fragil."));
       break;
     default:
-      saida.println("NENHUMA fonte de hora sem login. Precisa do cadastro do MAC (ou do GPS).");
+      saida.println(F("NENHUMA fonte de hora sem login. Precisa do cadastro do MAC (ou do GPS)."));
       break;
   }
-  saida.println("O LED pisca o numero da conclusao a cada 3 s.");
-  saida.println("================================================");
+  saida.println(F("O LED pisca o numero da conclusao a cada 3 s."));
+  saida.println(F("================================================"));
 }
 
 void testar() {
   if (!rede[0]) {
-    saida.println("Escolha a rede primeiro. Ex.: rede IFMS-Visitantes  (use 'redes' para listar, ou a pagina)");
+    saida.println(F("Escolha a rede primeiro. Ex.: rede IFMS-Visitantes  (use 'redes' para listar, ou a pagina)"));
     return;
   }
   memset(&res, 0, sizeof res);
@@ -846,7 +851,7 @@ void testar() {
   potenciaTentada = false;
   abrirRelatorio(rede);
   saida.println();
-  saida.println("################ TESTE DA REDE E DA PLACA ################");
+  saida.println(F("################ TESTE DA REDE E DA PLACA ################"));
   mostrarMac();
   testarPlaca();
   procurarRedes();
@@ -875,7 +880,7 @@ void testar() {
       if (ehPrivado(ipNome[i])) res.dnsDesviado = true;
     }
   }
-  if (res.dnsDesviado) saida.println("  Nomes da internet viraram IP interno: o portal desvia o DNS.");
+  if (res.dnsDesviado) saida.println(F("  Nomes da internet viraram IP interno: o portal desvia o DNS."));
 
   titulo("4. Paginas (HTTP), sem fazer login");
   char url[160];
@@ -928,14 +933,14 @@ void testar() {
 
   if (res.urlData[0]) {
     titulo("8. Refinando a hora do cabecalho Date");
-    saida.printf("  %s\n", res.urlData);
+    SAIDA("  %s\n", res.urlData);
     refinarData(res.urlData);
   }
   if (pararPedido) goto fim;
   compararRtcComRede();
 fim:
   if (escutando) terminarEscutaNtp();
-  if (pararPedido) saida.println("\n(teste interrompido a pedido)");
+  if (pararPedido) saida.println(F("\n(teste interrompido a pedido)"));
   imprimirResumo();
   fecharRelatorio();
 }
@@ -945,12 +950,12 @@ fim:
 // mostra se o portal derruba quem não fez login e se a fonte continua respondendo.
 void vigiar(int minutos) {
   if (!rede[0]) {
-    saida.println("Escolha a rede primeiro (rede NOME).");
+    saida.println(F("Escolha a rede primeiro (rede NOME)."));
     return;
   }
   abrirRelatorio("vigia");
-  saida.printf("\n######## VIGIA: %d min conectado sem login, conferindo a hora a cada minuto ########\n", minutos);
-  saida.println("(para interromper: parar, ou aperte o botao FLASH/BOOT)");
+  SAIDA("\n######## VIGIA: %d min conectado sem login, conferindo a hora a cada minuto ########\n", minutos);
+  saida.println(F("(para interromper: parar, ou aperte o botao FLASH/BOOT)"));
   if (WiFi.status() != WL_CONNECTED) {
     memset(&res, 0, sizeof res);
     potenciaTentada = false;
@@ -966,11 +971,11 @@ void vigiar(int minutos) {
   for (int i = 0; i < nFontes; i++)
     if (fontes[i].ip && fontes[i].tipo == NTP_EXTERNO && alvo < 0) alvo = i;
   if (alvo >= 0) {
-    saida.printf("Conferindo por %s\n", fontes[alvo].nome);
+    SAIDA("Conferindo por %s\n", fontes[alvo].nome);
   } else if (res.urlData[0]) {
-    saida.printf("Sem NTP: conferindo pelo Date de %s\n", res.urlData);
+    SAIDA("Sem NTP: conferindo pelo Date de %s\n", res.urlData);
   } else {
-    saida.println("Sem fonte de hora conhecida (rode 'testar' antes): so vou vigiar a conexao.");
+    saida.println(F("Sem fonte de hora conhecida (rode 'testar' antes): so vou vigiar a conexao."));
   }
   uint32_t quedas = 0, ok = 0, falhas = 0;
   int64_t deslocRef = alvo >= 0 ? fontes[alvo].deslocUs : 0;
@@ -980,28 +985,28 @@ void vigiar(int minutos) {
     if ((int32_t)(millis() - proxima) >= 0) {
       proxima += 60000;
       imprimirQuedas();
-      saida.printf("[%3lu min] ", (unsigned long)((millis() - inicio) / 60000UL));
+      SAIDA("[%3lu min] ", (unsigned long)((millis() - inicio) / 60000UL));
       if (WiFi.status() != WL_CONNECTED) {
         quedas++;
-        saida.println("DESCONECTADO (o portal ou a rede derrubou); reconectando...");
+        saida.println(F("DESCONECTADO (o portal ou a rede derrubou); reconectando..."));
         res.quedas = 0;
         conectar();
         continue;
       }
-      saida.printf("conectado, sinal %d dBm; ", (int)WiFi.RSSI());
+      SAIDA("conectado, sinal %d dBm; ", (int)WiFi.RSSI());
       if (alvo >= 0) {
         int64_t d, atraso;
         RespostaNtp r;
         int problema;
         if (ntpBruto(IPAddress(fontes[alvo].ip), d, atraso, r, problema)) {
           ok++;
-          saida.print("hora ");
+          saida.print(F("hora "));
           imprimirHora(d);
-          saida.printf(" (+-%.1f ms; %+lld ms desde o inicio, inclui a deriva do cristal do ESP)\n", atraso / 2000.0,
+          SAIDA(" (+-%.1f ms; %+lld ms desde o inicio, inclui a deriva do cristal do ESP)\n", atraso / 2000.0,
                        (long long)((d - deslocRef) / 1000));
         } else {
           falhas++;
-          saida.printf("NTP falhou (%s)\n", problema > 0 ? textoProblemaNtp(problema) : "sem resposta");
+          SAIDA("NTP falhou (%s)\n", problema > 0 ? textoProblemaNtp(problema) : "sem resposta");
         }
       } else if (res.urlData[0]) {
         AmostraData a;
@@ -1009,24 +1014,24 @@ void vigiar(int minutos) {
           ok++;
           int64_t d, inc;
           deslocDeUmaAmostra(a, d, inc);
-          saida.print("Date ");
+          saida.print(F("Date "));
           imprimirHora(d);
-          saida.println(" (+-0,5 s)");
+          saida.println(F(" (+-0,5 s)"));
         } else {
           falhas++;
-          saida.println("a pagina nao respondeu");
+          saida.println(F("a pagina nao respondeu"));
         }
       } else {
-        saida.println("ok");
+        saida.println(F("ok"));
       }
       sincronizarRelatorio();
     }
     pausa(100);
   }
-  saida.printf("\nVIGIA: %lu min; quedas da conexao: %lu; conferencias ok: %lu; falhas: %lu\n",
+  SAIDA("\nVIGIA: %lu min; quedas da conexao: %lu; conferencias ok: %lu; falhas: %lu\n",
                (unsigned long)((millis() - inicio) / 60000UL), (unsigned long)quedas, (unsigned long)ok,
                (unsigned long)falhas);
-  if (quedas == 0 && falhas == 0) saida.println("  A rede manteve o aparelho conectado e respondendo sem login.");
+  if (quedas == 0 && falhas == 0) saida.println(F("  A rede manteve o aparelho conectado e respondendo sem login."));
   fecharRelatorio();
 }
 
@@ -1038,30 +1043,30 @@ void salvarRede() {
 
 void ajuda() {
   saida.println();
-  saida.println("Comandos (digite e tecle Enter; os mesmos valem na pagina):");
-  saida.println("  mac                 mostra o MAC deste ESP (para a TI cadastrar)");
-  saida.println("  redes               procura as redes Wi-Fi por perto");
-  saida.println("  rede NOME           escolhe a rede (fica salvo)");
-  saida.println("  senha SENHA         senha da rede; 'senha' sozinho = rede aberta (fica salva)");
-  saida.println("  testar              testa a placa, conecta e testa a rede (2 a 4 minutos)");
-  saida.println("  vigiar [MIN]        fica conectado MIN minutos (30) conferindo a hora a cada minuto");
-  saida.println("  parar               interrompe o teste ou a vigia");
-  saida.println("  resumo              mostra de novo o resumo do ultimo teste");
-  saida.println("  rtc                 testa o relogio DS3231 (e compara com a hora da rede)");
-  saida.println("  rtc acertar         grava a hora da rede no DS3231, na virada do segundo");
-  saida.println("  rele [MS]           liga o rele por MS milissegundos (500)");
-  saida.println("  relatorios          lista os relatorios guardados na memoria do ESP");
-  saida.println("  relatorio N         mostra o relatorio N;  apagar-relatorios apaga todos");
-  saida.println("  hora                hora atual segundo a melhor fonte encontrada");
-  saida.println("  info                IP, roteador, DNS e sinal da conexao atual");
-  saida.println("  ntp IP-ou-NOME      testa um servidor de hora (ex.: o que a TI indicar)");
-  saida.println("  icmp IP             pede a hora por ICMP timestamp a um aparelho da rede");
-  saida.println("  http ENDERECO       le cabecalho e titulo de uma pagina (http:// ou https://)");
-  saida.println("  dns NOME            traduz um nome para IP");
-  saida.println("  potencia X          potencia do Wi-Fi: max, 8.5, 11 ou 15 dBm");
-  saida.println("  desconectar         sai da rede;  esquecer apaga a rede e a senha salvas");
-  saida.println("  reiniciar           reinicia o ESP");
-  saida.println("  ajuda               esta lista");
+  saida.println(F("Comandos (digite e tecle Enter; os mesmos valem na pagina):"));
+  saida.println(F("  mac                 mostra o MAC deste ESP (para a TI cadastrar)"));
+  saida.println(F("  redes               procura as redes Wi-Fi por perto"));
+  saida.println(F("  rede NOME           escolhe a rede (fica salvo)"));
+  saida.println(F("  senha SENHA         senha da rede; 'senha' sozinho = rede aberta (fica salva)"));
+  saida.println(F("  testar              testa a placa, conecta e testa a rede (2 a 4 minutos)"));
+  saida.println(F("  vigiar [MIN]        fica conectado MIN minutos (30) conferindo a hora a cada minuto"));
+  saida.println(F("  parar               interrompe o teste ou a vigia"));
+  saida.println(F("  resumo              mostra de novo o resumo do ultimo teste"));
+  saida.println(F("  rtc                 testa o relogio DS3231 (e compara com a hora da rede)"));
+  saida.println(F("  rtc acertar         grava a hora da rede no DS3231, na virada do segundo"));
+  saida.println(F("  rele [MS]           liga o rele por MS milissegundos (500)"));
+  saida.println(F("  relatorios          lista os relatorios guardados na memoria do ESP"));
+  saida.println(F("  relatorio N         mostra o relatorio N;  apagar-relatorios apaga todos"));
+  saida.println(F("  hora                hora atual segundo a melhor fonte encontrada"));
+  saida.println(F("  info                IP, roteador, DNS e sinal da conexao atual"));
+  saida.println(F("  ntp IP-ou-NOME      testa um servidor de hora (ex.: o que a TI indicar)"));
+  saida.println(F("  icmp IP             pede a hora por ICMP timestamp a um aparelho da rede"));
+  saida.println(F("  http ENDERECO       le cabecalho e titulo de uma pagina (http:// ou https://)"));
+  saida.println(F("  dns NOME            traduz um nome para IP"));
+  saida.println(F("  potencia X          potencia do Wi-Fi: max, 8.5, 11 ou 15 dBm"));
+  saida.println(F("  desconectar         sai da rede;  esquecer apaga a rede e a senha salvas"));
+  saida.println(F("  reiniciar           reinicia o ESP"));
+  saida.println(F("  ajuda               esta lista"));
 }
 
 void executar(char *linha) {
@@ -1076,9 +1081,9 @@ void executar(char *linha) {
   for (char *p = linha; *p; p++) *p = tolower((unsigned char)*p);
 
   if (!strcmp(linha, "senha")) {
-    saida.printf("> senha %s\n", arg[0] ? "********" : "(vazia)");
+    SAIDA("> senha %s\n", arg[0] ? "********" : "(vazia)");
   } else {
-    saida.printf("> %s %s\n", linha, arg);
+    SAIDA("> %s %s\n", linha, arg);
   }
 
   if (!strcmp(linha, "ajuda") || !strcmp(linha, "help") || !strcmp(linha, "?")) {
@@ -1090,11 +1095,11 @@ void executar(char *linha) {
     procurarRedes();
   } else if (!strcmp(linha, "rede")) {
     if (!arg[0]) {
-      saida.printf("Rede atual: \"%s\". Para mudar: rede NOME\n", rede);
+      SAIDA("Rede atual: \"%s\". Para mudar: rede NOME\n", rede);
     } else {
       snprintf(rede, sizeof rede, "%s", arg);
       salvarRede();
-      saida.printf("Rede escolhida: \"%s\". Se tiver senha: senha SENHA. Depois: testar\n", rede);
+      SAIDA("Rede escolhida: \"%s\". Se tiver senha: senha SENHA. Depois: testar\n", rede);
     }
   } else if (!strcmp(linha, "senha")) {
     snprintf(senha, sizeof senha, "%s", arg);
@@ -1108,7 +1113,7 @@ void executar(char *linha) {
     if (min > 600) min = 600;
     vigiar(min);
   } else if (!strcmp(linha, "parar")) {
-    saida.println("Nada em andamento.");
+    saida.println(F("Nada em andamento."));
   } else if (!strcmp(linha, "resumo")) {
     imprimirResumo();
   } else if (!strcmp(linha, "rtc")) {
@@ -1123,7 +1128,7 @@ void executar(char *linha) {
     listarRelatorios(saida, false);
   } else if (!strcmp(linha, "relatorio")) {
     if (!arg[0]) {
-      saida.println("Uso: relatorio NUMERO  (veja 'relatorios')");
+      saida.println(F("Uso: relatorio NUMERO  (veja 'relatorios')"));
     } else {
       mostrarRelatorio(strtoul(arg, NULL, 10));
     }
@@ -1132,20 +1137,20 @@ void executar(char *linha) {
   } else if (!strcmp(linha, "hora")) {
     const int m = melhorFonte();
     if (m < 0) {
-      saida.println("Nenhuma fonte de hora ainda. Digite: testar");
+      saida.println(F("Nenhuma fonte de hora ainda. Digite: testar"));
     } else {
-      saida.print("Agora: ");
+      saida.print(F("Agora: "));
       imprimirHora(fontes[m].deslocUs);
-      saida.printf(" (MS), segundo %s\n", fontes[m].nome);
+      SAIDA(" (MS), segundo %s\n", fontes[m].nome);
     }
   } else if (!strcmp(linha, "info")) {
     mostrarInfo();
   } else if (!strcmp(linha, "ntp") || !strcmp(linha, "icmp")) {
     IPAddress ip;
     if (!arg[0]) {
-      saida.printf("Uso: %s 10.0.0.1   ou   %s a.ntp.br\n", linha, linha);
+      SAIDA("Uso: %s 10.0.0.1   ou   %s a.ntp.br\n", linha, linha);
     } else if (WiFi.status() != WL_CONNECTED) {
-      saida.println("Conecte primeiro (testar).");
+      saida.println(F("Conecte primeiro (testar)."));
     } else if (ip.fromString(arg) || resolver(arg, ip, true)) {
       char rotulo[48];
       snprintf(rotulo, sizeof rotulo, "%s (%s)", txtIp(ip), arg);
@@ -1157,42 +1162,42 @@ void executar(char *linha) {
     }
   } else if (!strcmp(linha, "http")) {
     if (!arg[0]) {
-      saida.println("Uso: http http://10.0.0.1/   ou   http https://pagina.de.login/");
+      saida.println(F("Uso: http http://10.0.0.1/   ou   http https://pagina.de.login/"));
     } else if (WiFi.status() != WL_CONNECTED) {
-      saida.println("Conecte primeiro (testar).");
+      saida.println(F("Conecte primeiro (testar)."));
     } else {
       testarPagina(arg, true);
     }
   } else if (!strcmp(linha, "dns")) {
     IPAddress ip;
     if (!arg[0]) {
-      saida.println("Uso: dns a.ntp.br");
+      saida.println(F("Uso: dns a.ntp.br"));
     } else if (WiFi.status() != WL_CONNECTED) {
-      saida.println("Conecte primeiro (testar).");
+      saida.println(F("Conecte primeiro (testar)."));
     } else {
       resolver(arg, ip, true);
     }
   } else if (!strcmp(linha, "potencia")) {
     if (!arg[0]) {
-      saida.printf("Potencia atual: %s. Para mudar: potencia max | 8.5 | 11 | 15\n", textoPotencia());
+      SAIDA("Potencia atual: %s. Para mudar: potencia max | 8.5 | 11 | 15\n", textoPotencia());
     } else {
       definirPotencia(arg);
     }
   } else if (!strcmp(linha, "desconectar")) {
     desconectar();
-    saida.println("Desconectado.");
+    saida.println(F("Desconectado."));
   } else if (!strcmp(linha, "esquecer")) {
     rede[0] = 0;
     senha[0] = 0;
     prefs.remove("rede");
     prefs.remove("senha");
-    saida.println("Rede e senha apagadas.");
+    saida.println(F("Rede e senha apagadas."));
   } else if (!strcmp(linha, "reiniciar")) {
-    saida.println("Reiniciando...");
+    saida.println(F("Reiniciando..."));
     delay(200);
     ESP.restart();
   } else {
-    saida.println("Comando desconhecido. Digite: ajuda");
+    saida.println(F("Comando desconhecido. Digite: ajuda"));
   }
 }
 
@@ -1240,20 +1245,20 @@ void setup() {
   iniciarPagina();
 
   saida.println();
-  saida.println("=================================================");
-  saida.printf(" Teste de rede e da placa do sino (%s)\n", NOME_CHIP);
-  saida.println(" (nao faz login nem tenta passar pelo captcha)");
+  saida.println(F("================================================="));
+  SAIDA(" Teste de rede e da placa do sino (%s)\n", NOME_CHIP);
+  saida.println(F(" (nao faz login nem tenta passar pelo captcha)"));
   mostrarMac();
   mostrarComoAcessar();
-  saida.printf(" Botao GPIO%d (FLASH/BOOT) = testar tudo; S1 (GPIO%d) = testar o rele\n", PINO_BOTAO_TESTE,
+  SAIDA(" Botao GPIO%d (FLASH/BOOT) = testar tudo; S1 (GPIO%d) = testar o rele\n", PINO_BOTAO_TESTE,
                PINO_BOTAO_RELE);
-  saida.printf(" LED pisca a conclusao. Potencia Wi-Fi: %s\n", textoPotencia());
-  saida.println("=================================================");
+  SAIDA(" LED pisca a conclusao. Potencia Wi-Fi: %s\n", textoPotencia());
+  saida.println(F("================================================="));
   if (rede[0]) {
-    saida.printf("Rede salva: \"%s\". Testando...\n", rede);
+    SAIDA("Rede salva: \"%s\". Testando...\n", rede);
     enfileirar("testar");
   } else {
-    saida.println("Comece com: redes   (depois: rede NOME, senha SENHA, testar) ou pela pagina");
+    saida.println(F("Comece com: redes   (depois: rede NOME, senha SENHA, testar) ou pela pagina"));
   }
   ajuda();
 }

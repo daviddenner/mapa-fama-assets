@@ -4,6 +4,7 @@
 // computador.
 #pragma once
 #include <Arduino.h>
+#include <stdarg.h>
 
 class Registro : public Print {
  public:
@@ -20,6 +21,27 @@ class Registro : public Print {
     for (size_t i = 0; i < n; i++) anel[fim++ % TAM] = (char)d[i];
     if (copia) copia->write(d, n);
     return n;
+  }
+
+  // printf com o formato guardado na flash (PSTR): no ESP8266 isso deixa os
+  // textos fora da RAM. Use pela macro SAIDA("formato", ...).
+#if defined(ESP8266)
+  size_t printfP(const char *formato, ...) {
+#else
+  size_t printfP(const char *formato, ...) __attribute__((format(printf, 2, 3))) {  // confere os formatos
+#endif
+    char b[256];
+    va_list a;
+    va_start(a, formato);
+#if defined(ESP8266)
+    int n = vsnprintf_P(b, sizeof b, formato, a);
+#else
+    int n = vsnprintf(b, sizeof b, formato, a);
+#endif
+    va_end(a);
+    if (n < 0) return 0;
+    if (n >= (int)sizeof b) n = sizeof b - 1;  // linha longa demais: corta
+    return write((const uint8_t *)b, (size_t)n);
   }
 
   // Durante um teste, copia tudo também para 'p' (o arquivo do relatório).
