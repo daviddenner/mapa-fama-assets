@@ -305,6 +305,12 @@ void atualizarLed() {
     ligar = ciclo / 300 < conclusao && ciclo % 300 < 150;
   }
   digitalWrite(PINO_LED, ligar ? LED_ACESO : !LED_ACESO);
+  // LEDs de estado: verde = a rede dá a hora (conclusão 1 a 3); vermelho = não dá (4 a 6)
+  if (!ledsEmTeste) {
+    const bool temConclusao = !ocupado && conclusao;
+    digitalWrite(PINO_LED_VERDE, temConclusao && conclusao <= 3 ? HIGH : LOW);
+    digitalWrite(PINO_LED_VERMELHO, temConclusao && conclusao >= 4 ? HIGH : LOW);
+  }
 }
 
 // Um botão até o GND: devolve true uma vez a cada aperto (com filtro de 80 ms).

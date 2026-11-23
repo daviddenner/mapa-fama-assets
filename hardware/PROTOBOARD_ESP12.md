@@ -27,7 +27,8 @@ avulso, elas entram na protoboard:
 - Regulador de 3,3 V: **módulo AMS1117-3.3** (ou uma fonte de protoboard com
   saída de 3,3 V)
 - Capacitores: 100 µF (10 V ou mais) e 100 nF
-- Resistores: 10 kΩ (6), 1 kΩ (2)
+- Resistores: 10 kΩ (6), 1 kΩ (2), 330 Ω (2)
+- LEDs: 1 verde e 1 vermelho (estado do sino), mais 1 opcional para o relé
 - Botões táteis: 2 (RESET e FLASH), mais 1 opcional (S1, teste do relé)
 - **Adaptador USB-serial de 3,3 V** (CH340, CP2102 ou FTDI). Se ele tiver
   jumper de 5 V/3,3 V, deixe em **3,3 V**.
@@ -62,8 +63,8 @@ computador ou num carregador/power bank) ou de um cabo USB cortado.
 | RST | 10 kΩ até o 3,3 V; botão **RESET** até o GND |
 | GPIO0 | 10 kΩ até o 3,3 V; botão **FLASH** até o GND |
 | GPIO2 | 10 kΩ até o 3,3 V (é o LED azul do próprio ESP-12) |
-| GPIO15 | 10 kΩ até o **GND** |
-| ADC, GPIO16 | não ligar |
+| GPIO15 | 10 kΩ até o **GND** (é também o LED vermelho, abaixo) |
+| ADC | não ligar |
 
 Muitas placas adaptadoras brancas já trazem resistores pequenos (SMD) no EN e
 no GPIO15. Se a sua tiver, não precisa repetir esses dois.
@@ -123,6 +124,17 @@ esquerda para a direita: **C** (coletor), **B** (base), **E** (emissor).
 | LED (opcional): 5 V → 1 kΩ → perna longa; perna curta no **C** | acende com o relé ligado |
 | botão S1 (opcional): **GPIO13** → botão → GND | testa o relé |
 
+### LEDs de estado
+
+| De | Para |
+|---|---|
+| **GPIO16** | resistor de 330 Ω → perna longa do **LED verde**; perna curta no GND |
+| **GPIO15** | resistor de 330 Ω → perna longa do **LED vermelho**; perna curta no GND |
+
+Verde aceso = sistema OK (hora conferida pela rede). Vermelho aceso = perda de
+rede; piscando = sem hora (o sino não toca). O LED vermelho ajuda a manter o
+GPIO15 em 0 V na partida, junto com o resistor de 10 kΩ.
+
 As pernas do relé SRD não encaixam na protoboard: solde fios curtos nos dois
 pinos da bobina (os dois ao lado do pino comum). Com um **módulo relé pronto**,
 ligue o IN dele no GPIO12 e ajuste `RELE_ATIVO_EM_BAIXO` no programa.
@@ -134,7 +146,8 @@ ligue o IN dele no GPIO12 e ajuste `RELE_ATIVO_EM_BAIXO` no programa.
    `TESTE-SINO`.
 3. Digite `rtc`: deve responder `Relogio DS3231 ... RESPONDEU` e
    `O relogio esta andando`.
-4. Digite `rele` (ou aperte S1): o relé estala por meio segundo.
+4. Digite `rele` (ou aperte S1): o relé estala por meio segundo. Digite
+   `leds`: o verde e depois o vermelho acendem por 1 s.
 5. Escolha o Wi-Fi de casa (`rede NOME` e `senha SENHA`) e digite `testar`.
    No fim, `rtc acertar` grava a hora certa no DS3231.
 
@@ -159,3 +172,4 @@ cadastrar o MAC durante o teste, o cadastro continua valendo para o sino.
 | `Relogio DS3231 ... NAO RESPONDE` | SDA no GPIO4, SCL no GPIO5 (ou trocados, veja acima); VCC no 3,3 V |
 | Relé não estala | 5 V na bobina; BC548 na ordem C-B-E; 1 kΩ na base |
 | Relé ligado o tempo todo | BC548 invertido, ou `RELE_ATIVO_EM_BAIXO` errado |
+| LED não acende no comando `leds` | LED ao contrário (perna longa vai para o resistor); resistor de 330 Ω, não 330 kΩ |

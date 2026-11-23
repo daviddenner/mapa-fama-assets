@@ -63,6 +63,8 @@ saída de 127 V) está em [`../hardware`](../hardware). Resumo:
 | Relé | via R1 1 kΩ + BC548 | **GPIO12 (D6)** |
 | Botão de teste | um lado | **GPIO13 (D7)** |
 | Botão de teste | outro lado | GND |
+| LED verde (sistema OK) | via 330 Ω | **GPIO16 (D0)**; a outra perna no GND |
+| LED vermelho (perda de rede) | via 330 Ω | **GPIO15 (D8)**; a outra perna no GND |
 | GPS (opcional) | VCC | 3,3 V ou 5 V (o módulo tem regulador) |
 | GPS (opcional) | GND | GND |
 | GPS (opcional) | TX | **GPIO14 (D5)** |
@@ -206,6 +208,20 @@ ouvir saber que a rede do sino está fora. Ele some sozinho quando a rede volta
 e a hora é conferida. A página também mostra "AVISO SONORO LIGADO". Tempos e
 liga/desliga em `config.h` (`ALERTA_SEM_ACERTO_MIN`, `AVISO_SONORO`,
 `AVISO_PAUSA_MS`, `AVISO_BATIDA_MS`).
+
+## LEDs de estado (verde e vermelho)
+
+Para quem passa pelo sino, sem precisar abrir a página:
+
+| LED | Significado |
+|---|---|
+| **verde aceso** | sistema OK: hora conferida pela rede (ou pelo GPS) nos últimos 15 min |
+| **vermelho aceso** | perda de rede: a rede da instituição caiu há mais de 30 s, ou a hora não é conferida há mais de 15 min. O sino continua tocando na hora certa pelo DS3231 |
+| **vermelho piscando** | **sem hora**: o sino não vai tocar |
+
+Os tempos ficam em `config.h` (`LED_REDE_QUEDA_S`, `LED_REDE_SEM_CONFERIR_MIN`)
+e os pinos em `PINO_LED_VERDE` e `PINO_LED_VERMELHO`. O comando `status` do
+monitor serial também diz o estado dos LEDs.
 
 ## LED azul do ESP-12
 

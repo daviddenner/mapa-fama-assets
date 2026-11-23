@@ -30,7 +30,7 @@ pre{background:#111;color:#cfc;padding:10px;border-radius:8px;font-size:.78em;li
 <button class=c onclick="cmd('vigiar 30')">Vigiar 30 min</button><button class=c onclick="cmd('parar')">Parar</button>
 </section>
 <section><b>Placa do sino</b><br>
-<button class=c onclick="cmd('rele')">Testar relé</button><button class=c onclick="cmd('rtc')">Relógio</button>
+<button class=c onclick="cmd('rele')">Testar relé</button><button class=c onclick="cmd('leds')">Testar LEDs</button><button class=c onclick="cmd('rtc')">Relógio</button>
 <button class=c onclick="if(confirm('Gravar no relogio DS3231 a hora da rede?'))cmd('rtc acertar')">Acertar relógio pela rede</button>
 </section>
 <section><div class=linha><input id=cmd placeholder="comando (ex.: ntp 10.0.0.1 | http http://10.0.0.1/ | ajuda)" autocapitalize=off onkeydown="if(event.key=='Enter')enviar()"><button onclick="enviar()">Enviar</button></div></section>

@@ -25,11 +25,16 @@ bool rtcResponde = false;
 bool rtcDiferencaMedida = false;
 int64_t rtcDiferencaUs = 0;  // DS3231 - hora certa, na última medida
 uint32_t vezesRele = 0;
+bool ledsEmTeste = false;  // durante o teste dos LEDs, o laço não mexe neles
 
 void iniciarPlaca() {
   digitalWrite(PINO_RELE, RELE_DESLIGADO);  // antes do pinMode: não estala ao ligar
   pinMode(PINO_RELE, OUTPUT);
   pinMode(PINO_BOTAO_RELE, INPUT_PULLUP);
+  digitalWrite(PINO_LED_VERDE, LOW);
+  pinMode(PINO_LED_VERDE, OUTPUT);
+  digitalWrite(PINO_LED_VERMELHO, LOW);
+  pinMode(PINO_LED_VERMELHO, OUTPUT);
   Wire.begin(PINO_SDA, PINO_SCL);
   Wire.setClock(400000);
 }
@@ -246,10 +251,27 @@ void testarRele(uint32_t ms) {
   saida.println(F("desligado. Deve ter estalado e o LED do rele acendido."));
 }
 
+// LEDs de estado do sino: verde = sistema OK; vermelho = perda de rede.
+void testarLeds() {
+  ledsEmTeste = true;
+  SAIDA("  LED verde (GPIO%d): aceso por 1 s... ", PINO_LED_VERDE);
+  digitalWrite(PINO_LED_VERMELHO, LOW);
+  digitalWrite(PINO_LED_VERDE, HIGH);
+  pausa(1000);
+  digitalWrite(PINO_LED_VERDE, LOW);
+  SAIDA("apagado.\n  LED vermelho (GPIO%d): aceso por 1 s... ", PINO_LED_VERMELHO);
+  digitalWrite(PINO_LED_VERMELHO, HIGH);
+  pausa(1000);
+  digitalWrite(PINO_LED_VERMELHO, LOW);
+  saida.println(F("apagado. Confira se os dois acenderam."));
+  ledsEmTeste = false;
+}
+
 // Parte da placa no teste completo (o relé fica de fora de propósito).
 void testarPlaca() {
-  titulo("0. Placa: relogio DS3231 e rele");
+  titulo("0. Placa: relogio DS3231, LEDs e rele");
   testarRtc(false);
+  testarLeds();
   SAIDA("  Rele (GPIO%d): nao e acionado no teste automatico. Teste com o botao S1 (GPIO%d),\n", PINO_RELE,
                PINO_BOTAO_RELE);
   saida.println(F("      com o comando 'rele' ou pelo botao da pagina."));
@@ -257,6 +279,8 @@ void testarPlaca() {
 
 void resumoPlaca() {
   SAIDA("Relogio DS3231 ... %s\n", situacaoRtc);
+  SAIDA("LEDs de estado ... verde GPIO%d e vermelho GPIO%d acenderam no inicio do teste? (comando 'leds')\n",
+        PINO_LED_VERDE, PINO_LED_VERMELHO);
   if (vezesRele) {
     SAIDA("Rele ............. acionado %lu vez(es) nesta sessao (confira se estalou)\n", (unsigned long)vezesRele);
   } else {

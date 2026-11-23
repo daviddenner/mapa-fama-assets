@@ -62,6 +62,16 @@ módulo.
 |---|---|
 | **D7** | botão → **G** |
 
+### LEDs de estado
+
+| De | Para |
+|---|---|
+| **D0** | resistor de 330 Ω → perna longa do **LED verde**; perna curta no **G** |
+| **D8** | resistor de 330 Ω → perna longa do **LED vermelho**; perna curta no **G** |
+
+Verde aceso = sistema OK (hora conferida pela rede). Vermelho aceso = perda de
+rede; piscando = sem hora (o sino não toca).
+
 ## Firmware
 
 1. Na Arduino IDE (pacote ESP8266), abra `sino-gps/sino_gps/sino_gps.ino`.
@@ -94,7 +104,8 @@ se fosse a rede da instituição.
    LED acende por 2 s.
 5. **Horário:** na página, coloque um horário daqui a 2 minutos e salve. O
    relé deve bater exatamente na virada do minuto.
-6. **Rede caindo:** desligue o roteador (ou o roteador do celular). Depois de
+6. **Rede caindo:** desligue o roteador (ou o roteador do celular). Em 30 s o
+   LED verde apaga e o **vermelho acende**. Depois de
    `ALERTA_SEM_ACERTO_MIN`, o LED azul passa a dar 2 piscadas por segundo e os
    toques ganham a batida curta do aviso (toque, pausa de 0,5 s, batida de
    0,5 s). Ligue o roteador de novo: em poucos minutos a hora é conferida e o

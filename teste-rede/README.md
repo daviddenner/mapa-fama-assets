@@ -17,7 +17,7 @@ Montagem do ESP-12 avulso com relé e relógio:
 
 | Jeito | Como |
 |---|---|
-| **Celular** (recomendado no campus) | conecte no Wi-Fi **`TESTE-SINO`** (senha `sino12345`) e abra **http://192.168.4.1**. A página mostra a mesma saída do monitor serial e tem os botões "Testar tudo", "Vigiar", "Testar relé", "Relógio", a caixa de comandos e os relatórios guardados |
+| **Celular** (recomendado no campus) | conecte no Wi-Fi **`TESTE-SINO`** (senha `sino12345`) e abra **http://192.168.4.1**. A página mostra a mesma saída do monitor serial e tem os botões "Testar tudo", "Vigiar", "Testar relé", "Testar LEDs", "Relógio", a caixa de comandos e os relatórios guardados |
 | **Monitor serial** | 115200 baud, final de linha "Nova linha". Digite `ajuda` |
 | **Sem nada** | aperte o botão **FLASH** (ESP-12) ou **BOOT** (ESP32): o teste roda sozinho e o **LED pisca a conclusão** (tabela abaixo). O relatório fica guardado na memória do ESP para você ler depois, em casa |
 
@@ -66,7 +66,8 @@ cada uma: a página deixa trocar a rede e rodar de novo.
 ## O que ele testa
 
 0. **Placa:** o DS3231 responde? A hora guardada vale (ou o relógio parou)?
-   Está andando? Temperatura do chip. O relé **não** é acionado no teste
+   Está andando? Temperatura do chip. Os **LEDs de estado** (verde e
+   vermelho) acendem 1 s cada: confira. O relé **não** é acionado no teste
    automático: use o botão S1, o comando `rele` ou o botão da página.
 1. **MAC do ESP**, para a TI cadastrar, e **redes por perto** (nome, sinal e
    tipo de segurança).
@@ -98,8 +99,10 @@ cada uma: a página deixa trocar a rede e rodar de novo.
 
 ## Como ler a conclusão (e o LED)
 
-Parado, o LED pisca o número da conclusão a cada 3 segundos. Piscando rápido =
-teste em andamento. Apagado = ainda sem teste.
+Parado, o LED azul pisca o número da conclusão a cada 3 segundos. Piscando
+rápido = teste em andamento. Apagado = ainda sem teste. Se a placa tiver os
+LEDs de estado, depois do teste o **verde** acende para as conclusões 1 a 3 (a
+rede dá a hora) e o **vermelho** para 4 a 6.
 
 | Piscadas | Conclusão | O que significa |
 |---|---|---|
@@ -127,6 +130,7 @@ Valem no monitor serial e na caixa de comandos da página.
 | `rtc` | testa o relógio DS3231 e compara com a hora da rede, se já tiver uma |
 | `rtc acertar` | grava a hora da rede no DS3231, na virada do segundo (como o sino faz) |
 | `rele [MS]` | liga o relé por MS milissegundos (500; no máximo 3000) |
+| `leds` | acende o LED verde e depois o vermelho, 1 s cada |
 | `relatorios` | lista os relatórios guardados na memória (4 no ESP-12, 6 no ESP32) |
 | `relatorio N` | mostra o relatório N; `apagar-relatorios` apaga todos |
 | `hora` | hora atual segundo a melhor fonte encontrada |
@@ -148,7 +152,8 @@ Valem no monitor serial e na caixa de comandos da página.
 | Relé (via BC548) | GPIO12 (D6) | GPIO3 | GPIO26 |
 | Botão S1: testar o relé | GPIO13 (D7) | GPIO1 | GPIO27 |
 | Botão: testar tudo | FLASH = GPIO0 | BOOT = GPIO9 | BOOT = GPIO0 |
-| LED | GPIO2, do próprio ESP-12 (acende em 0) | GPIO8 (acende em 0) | GPIO2 |
+| LED azul | GPIO2, do próprio ESP-12 (acende em 0) | GPIO8 (acende em 0) | GPIO2 |
+| LED verde / vermelho (330 Ω até o GND) | GPIO16 (D0) / GPIO15 (D8) | GPIO6 / GPIO7 | GPIO32 / GPIO33 |
 
 Mude no começo do `.ino` se a sua placa for diferente. Com módulo relé que
 liga em 0 V, use `RELE_ATIVO_EM_BAIXO 1`.

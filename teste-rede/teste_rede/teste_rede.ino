@@ -50,6 +50,8 @@
 #define PINO_BOTAO_TESTE 0   // FLASH (GPIO0) = testar tudo
 #define PINO_LED 2           // LED azul do próprio ESP-12 (acende em 0)
 #define LED_ACESO LOW
+#define PINO_LED_VERDE 16    // D0: LED verde (sistema OK), 330 Ω até o GND
+#define PINO_LED_VERMELHO 15 // D8: LED vermelho (perda de rede), 330 Ω até o GND
 #elif defined(CONFIG_IDF_TARGET_ESP32C3)
 #define MAX_RELATORIOS 6
 #define PINO_SDA 4
@@ -59,6 +61,8 @@
 #define PINO_BOTAO_TESTE 9  // BOOT
 #define PINO_LED 8          // LED azul das placas C3 "Super Mini" (acende em 0)
 #define LED_ACESO LOW
+#define PINO_LED_VERDE 6
+#define PINO_LED_VERMELHO 7
 #else  // ESP32 Dev Module
 #define MAX_RELATORIOS 6
 #define PINO_SDA 21
@@ -68,6 +72,8 @@
 #define PINO_BOTAO_TESTE 0  // BOOT
 #define PINO_LED 2
 #define LED_ACESO HIGH
+#define PINO_LED_VERDE 32
+#define PINO_LED_VERMELHO 33
 #endif
 
 // ------------------------------------------------------------------ Estado
@@ -1055,6 +1061,7 @@ void ajuda() {
   saida.println(F("  rtc                 testa o relogio DS3231 (e compara com a hora da rede)"));
   saida.println(F("  rtc acertar         grava a hora da rede no DS3231, na virada do segundo"));
   saida.println(F("  rele [MS]           liga o rele por MS milissegundos (500)"));
+  saida.println(F("  leds                acende o LED verde e depois o vermelho, 1 s cada"));
   saida.println(F("  relatorios          lista os relatorios guardados na memoria do ESP"));
   saida.println(F("  relatorio N         mostra o relatorio N;  apagar-relatorios apaga todos"));
   saida.println(F("  hora                hora atual segundo a melhor fonte encontrada"));
@@ -1124,6 +1131,8 @@ void executar(char *linha) {
     }
   } else if (!strcmp(linha, "rele")) {
     testarRele(arg[0] ? (uint32_t)atol(arg) : 500);
+  } else if (!strcmp(linha, "leds")) {
+    testarLeds();
   } else if (!strcmp(linha, "relatorios")) {
     listarRelatorios(saida, false);
   } else if (!strcmp(linha, "relatorio")) {

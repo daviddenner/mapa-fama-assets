@@ -34,6 +34,7 @@ para não sobrescrever o esquema que já existe lá. Para desenhar a placa, use
 | **Relé (K1)** | Relé 5 V acionado por **Q1 (BC548)**. R1 (1 kΩ) na base, **R2 (10 kΩ)** segura o relé desligado enquanto o ESP liga ou é gravado, **D1 (1N4007) é o diodo de roda livre**. LED1 + R3 acendem quando o relé liga |
 | **Saída 127 V** | Fase entra em **J2.1**, passa pelo **fusível F1** e vai ao **COM** do relé; o **NA** volta por **J2.2** para o sino. O neutro vai direto ao sino. R4 + C3 (snubber, opcional) protegem o contato |
 | **Botão S1** | Toque de teste na mão |
+| **LEDs de estado** | **LED2 verde** = sistema OK (hora conferida pela rede); **LED3 vermelho** = perda de rede (aceso) ou sem hora (piscando). Cada um com resistor de 330 Ω até o GND |
 | **J3 (opcional)** | Conector para o GPS GY-NEO6MV2, na mesma ordem dos pinos do módulo (VCC, RX, TX, GND) |
 
 ### Pinos do NodeMCU
@@ -46,6 +47,8 @@ para não sobrescrever o esquema que já existe lá. Para desenhar a placa, use
 | D5 | 14 | TX do GPS (opcional) | `PINO_GPS_RX` |
 | D6 | 12 | R1 → base do BC548 (relé) | `PINO_RELE` |
 | D7 | 13 | botão de teste S1 (até o GND) | `PINO_BOTAO_TESTE` |
+| D0 | 16 | R5 330 Ω → LED2 verde → GND | `PINO_LED_VERDE` |
+| D8 | 15 | R6 330 Ω → LED3 vermelho → GND (o LED também ajuda a manter o D8 em 0 V na partida) | `PINO_LED_VERMELHO` |
 | VIN | – | +5 V da fonte | – |
 | 3V | – | VCC do DS3231 | – |
 | G | – | GND | – |
@@ -66,6 +69,7 @@ O que muda em relação ao NodeMCU:
 | **R5 a R9 (10 kΩ)** | partida do ESP-12: EN, RST, GPIO0 e GPIO2 em 3,3 V; GPIO15 no GND |
 | **S2 (RESET) e S3 (FLASH)** | para gravar: segure FLASH, aperte RESET, solte FLASH |
 | **J4** | adaptador USB-serial de 3,3 V: GND, RX e TX do ESP (TX do adaptador no RX do ESP) |
+| **LEDs de estado** | iguais aos do NodeMCU: LED2 verde no GPIO16 e LED3 vermelho no GPIO15, com R10 e R11 (330 Ω) |
 
 Peças a mais na lista de material: ESP-12E/F (em vez do NodeMCU), AMS1117-3.3
 (SOT-223), capacitor eletrolítico 100 µF 10 V, capacitor cerâmico 100 nF,
@@ -92,7 +96,10 @@ ESP-12 na placa tem medidas aproximadas: confira no datasheet antes de furar.
 | K1 | Relé 5 V SRD-05VDC-SL-C (Songle) | 1 |
 | Q1 | Transistor BC548 (ou BC337, mesma pinagem) | 1 |
 | D1 | Diodo 1N4007 | 1 |
-| LED1 | LED 3 mm vermelho | 1 |
+| LED1 | LED 3 mm vermelho (relé ligado) | 1 |
+| LED2 | LED 3 mm verde (sistema OK) | 1 |
+| LED3 | LED 3 mm vermelho (perda de rede) | 1 |
+| R5, R6 | Resistor 330 Ω 1/4 W (LEDs de estado) | 2 |
 | R1, R3 | Resistor 1 kΩ 1/4 W | 2 |
 | R2 | Resistor 10 kΩ 1/4 W | 1 |
 | R4 | Resistor 100 Ω 1/2 W (snubber, opcional) | 1 |

@@ -663,8 +663,30 @@ def ligar_direita():
          juncoes=[(251.46, 53.34)])
 
 
+def leds_estado(rv, rr):
+    """LEDs de estado: verde (sistema OK) e vermelho (perda de rede), 330 ohms até o GND."""
+    E.peca(rv, "RESISTOR", "-1/4W", "330")
+    E.peca(rr, "RESISTOR", "-1/4W", "330")
+    E.peca("LED2", "LED", "", "VERDE")
+    E.peca("LED3", "LED", "", "VERMELHO")
+    yv, yr = 170.18, 154.94
+    E.coloca(rv, "G$1", 246.38, yv)
+    E.coloca("LED2", "G$1", 261.62, yv)
+    E.coloca(rr, "G$1", 246.38, yr)
+    E.coloca("LED3", "G$1", 261.62, yr)
+    toco("LED_VERDE", rv, "G$1", "1", "esq")
+    ramo("LED2_ANODO", (rv, "G$1", "2"), ("LED2", "G$1", "A"))
+    ramo("GND", ("LED2", "G$1", "C"), (271.78, 165.1), via=[(271.78, yv)], alim=True)
+    toco("LED_VERMELHO", rr, "G$1", "1", "esq")
+    ramo("LED3_ANODO", (rr, "G$1", "2"), ("LED3", "G$1", "A"))
+    ramo("GND", ("LED3", "G$1", "C"), (271.78, 144.78), via=[(271.78, yr)], alim=True)
+
+
+LEGENDAS_LEDS = [(241.3, 162.56, "sistema OK"), (241.3, 147.32, "perda de rede")]
+
 TITULOS_DIREITA = [
     (182.88, 175.26, "RELOGIO DS3231 - LADO DE 4 PINOS"),
+    (236.22, 175.26, "LEDS DE ESTADO"),
     (182.88, 147.32, "GPS (OPCIONAL)"),
     (213.36, 142.24, "ACIONAMENTO DO RELE"),
     (160.02, 106.68, "BOTAO DE TESTE"),
@@ -703,7 +725,10 @@ def esquema_nodemcu():
     toco("GPS_TX", "U1", "G$1", "D5/GPIO14", "dir")
     toco("RELE", "U1", "G$1", "D6/GPIO12", "dir")
     toco("BOTAO", "U1", "G$1", "D7/GPIO13", "dir")
+    toco("LED_VERDE", "U1", "G$1", "D0/GPIO16", "dir")
+    toco("LED_VERMELHO", "U1", "G$1", "D8/GPIO15", "dir")
     ligar_direita()
+    leds_estado("R5", "R6")
 
     titulos = [(12.7, 177.8, "ALIMENTACAO 5V"), (73.66, 139.7, "NODEMCU V3 (LOLIN)")] + TITULOS_DIREITA
     notas = [
@@ -718,9 +743,10 @@ def esquema_nodemcu():
         "8. 127V: fase -> J2.1 -> F1 -> COM; NA -> J2.2 -> sino; neutro direto no sino.",
         "9. Snubber R4+C3 opcional (protege o contato e evita reset do ESP).",
         "10. Na placa: deixar 6 mm ou mais entre a parte de 127V e o resto do circuito.",
+        "11. LED2 verde (D0) = sistema OK; LED3 vermelho (D8) = perda de rede (piscando = sem hora).",
     ]
-    rodape = ("NodeMCU v3 + DS3231 + rele 5V   Rev. 3   2026-11-13", "Firmware: sino-gps/sino_gps")
-    return titulos, notas, rodape
+    rodape = ("NodeMCU v3 + DS3231 + rele 5V   Rev. 4   2026-11-23", "Firmware: sino-gps/sino_gps")
+    return titulos, notas, rodape, LEGENDAS_LEDS
 
 
 # ------------------------------------------- esquema 2: ESP-12 avulso (sem placa)
@@ -770,9 +796,10 @@ def esquema_esp12():
     ramo("GND", ("C4", "G$1", "-"), (119.38, 144.78))
     ramo("GND", ("C5", "G$1", "1"), (139.7, 144.78))
 
-    # ESP-12: tudo por rótulos (ADC e GPIO16 ficam sem ligar)
+    # ESP-12: tudo por rótulos (o ADC fica sem ligar)
     toco("RST", "U1", "G$1", "RST", "esq")
     toco("EN", "U1", "G$1", "EN", "esq")
+    toco("LED_VERDE", "U1", "G$1", "GPIO16", "esq")
     toco("GPS_TX", "U1", "G$1", "GPIO14", "esq")
     toco("RELE", "U1", "G$1", "GPIO12", "esq")
     toco("BOTAO", "U1", "G$1", "GPIO13", "esq")
@@ -783,12 +810,12 @@ def esquema_esp12():
     toco("SDA", "U1", "G$1", "GPIO4", "dir")
     toco("GPIO0", "U1", "G$1", "GPIO0", "dir")
     toco("GPIO2", "U1", "G$1", "GPIO2", "dir")
-    toco("GPIO15", "U1", "G$1", "GPIO15", "dir")
+    toco("LED_VERMELHO", "U1", "G$1", "GPIO15", "dir")
     toco("GND", "U1", "G$1", "GND", "dir")
 
     # Resistores de partida e botões RESET/FLASH
     for nome, de, para in (("R5", "+3V3", "EN"), ("R6", "+3V3", "RST"), ("R7", "+3V3", "GPIO0"),
-                           ("R8", "+3V3", "GPIO2"), ("R9", "GPIO15", "GND")):
+                           ("R8", "+3V3", "GPIO2"), ("R9", "LED_VERMELHO", "GND")):
         toco(de, nome, "G$1", "1", "esq")
         toco(para, nome, "G$1", "2", "dir")
     toco("RST", "S2", "G$1", "1", "esq")
@@ -801,6 +828,7 @@ def esquema_esp12():
     toco("RXD0", "J4", "G$1", "2", "esq")
     toco("TXD0", "J4", "G$1", "3", "esq")
     ligar_direita()
+    leds_estado("R10", "R11")
 
     titulos = [(12.7, 177.8, "ALIMENTACAO 5V E 3,3V"), (88.9, 127.0, "ESP-12 (ESP8266)"),
                (27.94, 132.08, "RESISTORES DE PARTIDA (BOOT)"), (17.78, 87.63, "BOTOES RESET E FLASH"),
@@ -809,17 +837,18 @@ def esquema_esp12():
         "NOTAS",
         "1. 5V em J1 (USB ou carregador na protoboard; HLK-PM01 na placa): rele e regulador U3.",
         "2. U3 (AMS1117-3.3) da os 3,3V do ESP-12 e do RTC. O ESP-12 so aceita 3,3V: nunca ligue 5V nele.",
-        "3. Partida: EN, RST, GPIO0 e GPIO2 em 3,3V (10k); GPIO15 no GND (10k). ADC e GPIO16: nao ligar.",
+        "3. Partida: EN, RST, GPIO0 e GPIO2 em 3,3V (10k); GPIO15 no GND (R9 10k e LED3). ADC: nao ligar.",
         "4. Gravar: adaptador USB-serial 3,3V em J4 (TX dele no RX). Segure FLASH, aperte RESET, solte FLASH.",
         "5. Q1 liga o rele com GPIO12 em nivel ALTO: RELE_ATIVO_EM_BAIXO = false. R2 segura o rele no boot.",
         "6. D1 = diodo de roda livre (catodo no +5V). O LED azul do proprio ESP-12 fica no GPIO2.",
         "7. RTC: SCL no GPIO5, SDA no GPIO4 (alguns modulos trocam 4 e 5 na serigrafia).",
         "8. 127V: fase -> J2.1 -> F1 -> COM; NA -> J2.2 -> sino; neutro direto. Snubber R4+C3 opcional.",
         "9. Na placa: deixar 6 mm ou mais entre a parte de 127V e o resto do circuito.",
+        "10. LED2 verde (GPIO16) = sistema OK; LED3 vermelho (GPIO15) = perda de rede (piscando = sem hora).",
     ]
-    rodape = ("ESP-12 + DS3231 + rele 5V   Rev. 1   2026-11-16",
+    rodape = ("ESP-12 + DS3231 + rele 5V   Rev. 2   2026-11-23",
               "Firmware: sino-gps/sino_gps; teste: teste-rede/teste_rede")
-    return titulos, notas, rodape
+    return titulos, notas, rodape, LEGENDAS_LEDS
 
 
 # ================================================================ conferência
@@ -1055,11 +1084,13 @@ def xml_esquema(variante):
     return "\n".join(L) + "\n"
 
 
-def montar_plano(titulos, notas, rodape):
+def montar_plano(titulos, notas, rodape, legendas=()):
     for (a1, b1, a2, b2) in ((0, 0, 279.4, 0), (279.4, 0, 279.4, 190.5), (279.4, 190.5, 0, 190.5), (0, 190.5, 0, 0)):
         E.plano.append(("wire", (a1, b1, a2, b2, 0.4064, 94)))
     for x, y, t in titulos:
         E.plano.append(("text", (x, y, t, 2.1844, 97)))
+    for x, y, t in legendas:
+        E.plano.append(("text", (x, y, t, 1.778, 97)))
     for i, linha in enumerate(notas):
         E.plano.append(("text", (7.62, 72.39 - i * 3.81, linha, 1.778 if i else 2.1844, 97)))
     # quadro de título

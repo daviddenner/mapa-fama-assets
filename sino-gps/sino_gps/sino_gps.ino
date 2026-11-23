@@ -232,6 +232,7 @@ void imprimirStatus() {
     Serial.print(F(" | GPS: "));
     Serial.print(gpsComSinal ? F("com sinal") : F("sem sinal"));
   }
+  Serial.printf(" | LED: %s", textoLeds());
   if (avisoSonoroAtivo()) Serial.print(F(" | AVISO SONORO LIGADO"));
   if (horaValida) {
     const uint32_t prox = proximoToque(cfg.horarios, cfg.nHorarios, paraLocal(epochUtc));
@@ -460,6 +461,37 @@ void atualizarLed() {
   digitalWrite(PINO_LED, aceso ? LOW : HIGH);
 }
 
+// LEDs de estado (veja config.h): verde = sistema OK; vermelho = perda de rede
+// (aceso) ou sem hora (piscando).
+bool perdaDeRede() {
+  static uint32_t ultimaVezConectada = 0;
+  if (instConectada()) ultimaVezConectada = millis();
+  const bool redeCaiu =
+      cfg.instNome[0] && !instConectada() && millis() - ultimaVezConectada > LED_REDE_QUEDA_S * 1000UL;
+  const bool semConferir =
+      !algumaConfirmacao || millis() - ultimaConfirmacaoMs > LED_REDE_SEM_CONFERIR_MIN * 60000UL;
+  return redeCaiu || semConferir;
+}
+
+uint8_t estadoLeds() {  // 0 = verde, 1 = vermelho aceso, 2 = vermelho piscando
+  if (!rtcOk || !horaValida) return 2;
+  return perdaDeRede() ? 1 : 0;
+}
+
+const char *textoLeds() {
+  switch (estadoLeds()) {
+    case 0: return "verde (sistema OK)";
+    case 1: return "VERMELHO (perda de rede)";
+    default: return "VERMELHO PISCANDO (sem hora)";
+  }
+}
+
+void atualizarLedsEstado() {
+  const uint8_t e = estadoLeds();
+  digitalWrite(PINO_LED_VERDE, e == 0 ? HIGH : LOW);
+  digitalWrite(PINO_LED_VERMELHO, e == 1 || (e == 2 && (millis() / 250) % 2) ? HIGH : LOW);
+}
+
 void atualizarBotao() {
   static bool ultimoLido = false, estado = false;
   static uint32_t mudouEm = 0;
@@ -555,6 +587,10 @@ void setup() {
   rele(false);
   pinMode(PINO_LED, OUTPUT);
   digitalWrite(PINO_LED, HIGH);
+  digitalWrite(PINO_LED_VERDE, LOW);
+  pinMode(PINO_LED_VERDE, OUTPUT);
+  digitalWrite(PINO_LED_VERMELHO, LOW);
+  pinMode(PINO_LED_VERMELHO, OUTPUT);
   pinMode(PINO_BOTAO_TESTE, INPUT_PULLUP);
 
   Serial.begin(115200);
@@ -585,6 +621,7 @@ void loop() {
   atualizarToque();
   atualizarBotao();
   atualizarLed();
+  atualizarLedsEstado();
   lerSerial();
   atualizarWeb();
   atualizarNtp();

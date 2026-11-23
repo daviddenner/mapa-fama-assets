@@ -18,6 +18,17 @@
 #define PINO_BOTAO_TESTE 13  // GPIO13 (D7) -> botão até o GND (toque manual). Opcional.
 #define PINO_LED 2           // GPIO2  (D4): LED azul do próprio ESP-12 (acende em LOW)
 
+// LEDs de estado, cada um com resistor de 330 Ω até o GND (acendem em 3,3 V):
+//   verde aceso ........ sistema OK: hora conferida pela rede (ou pelo GPS)
+//   vermelho aceso ..... perda de rede: sem a rede da instituição ou sem
+//                        conferir a hora. O sino continua tocando pelo DS3231.
+//   vermelho piscando .. SEM HORA: o sino não vai tocar
+// O LED do GPIO15 ajuda a mantê-lo em 0 V na partida, como o ESP-12 exige.
+#define PINO_LED_VERDE 16     // GPIO16 (D0)
+#define PINO_LED_VERMELHO 15  // GPIO15 (D8)
+#define LED_REDE_QUEDA_S 30            // vermelho se a rede da instituição cair por mais que isto
+#define LED_REDE_SEM_CONFERIR_MIN 15   // vermelho se a hora ficar sem conferir por mais que isto
+
 // Como o relé é acionado. ERRAR ISTO DEIXA O SINO TOCANDO SEM PARAR.
 //   false = o relé liga quando o pino vai a 3,3 V: placa do esquema (BC548),
 //           módulo relé com jumper "H", módulo com transistor ou SSR

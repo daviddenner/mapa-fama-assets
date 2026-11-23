@@ -876,6 +876,12 @@
 <part name="GND4" library="sino_ifms" deviceset="GND" device=""/>
 <part name="GND5" library="sino_ifms" deviceset="GND" device=""/>
 <part name="GND6" library="sino_ifms" deviceset="GND" device=""/>
+<part name="R5" library="sino_ifms" deviceset="RESISTOR" device="-1/4W" value="330"/>
+<part name="R6" library="sino_ifms" deviceset="RESISTOR" device="-1/4W" value="330"/>
+<part name="LED2" library="sino_ifms" deviceset="LED" device="" value="VERDE"/>
+<part name="LED3" library="sino_ifms" deviceset="LED" device="" value="VERMELHO"/>
+<part name="GND7" library="sino_ifms" deviceset="GND" device=""/>
+<part name="GND8" library="sino_ifms" deviceset="GND" device=""/>
 </parts>
 <sheets>
 <sheet>
@@ -887,10 +893,13 @@
 <text x="12.7" y="177.8" size="2.1844" layer="97">ALIMENTACAO 5V</text>
 <text x="73.66" y="139.7" size="2.1844" layer="97">NODEMCU V3 (LOLIN)</text>
 <text x="182.88" y="175.26" size="2.1844" layer="97">RELOGIO DS3231 - LADO DE 4 PINOS</text>
+<text x="236.22" y="175.26" size="2.1844" layer="97">LEDS DE ESTADO</text>
 <text x="182.88" y="147.32" size="2.1844" layer="97">GPS (OPCIONAL)</text>
 <text x="213.36" y="142.24" size="2.1844" layer="97">ACIONAMENTO DO RELE</text>
 <text x="160.02" y="106.68" size="2.1844" layer="97">BOTAO DE TESTE</text>
 <text x="167.64" y="71.12" size="2.1844" layer="97">SAIDA 127V PARA O SINO</text>
+<text x="241.3" y="162.56" size="1.778" layer="97">sistema OK</text>
+<text x="241.3" y="147.32" size="1.778" layer="97">perda de rede</text>
 <text x="7.62" y="72.39" size="2.1844" layer="97">NOTAS</text>
 <text x="7.62" y="68.58" size="1.778" layer="97">1. Fonte 5V (ex.: HLK-PM01) em J1: alimenta o rele e o NodeMCU pelo pino VIN.</text>
 <text x="7.62" y="64.77" size="1.778" layer="97">2. O 3V do NodeMCU alimenta o RTC (bateria CR2032). VU = 5V do USB: nao ligar.</text>
@@ -902,11 +911,12 @@
 <text x="7.62" y="41.91" size="1.778" layer="97">8. 127V: fase -&gt; J2.1 -&gt; F1 -&gt; COM; NA -&gt; J2.2 -&gt; sino; neutro direto no sino.</text>
 <text x="7.62" y="38.1" size="1.778" layer="97">9. Snubber R4+C3 opcional (protege o contato e evita reset do ESP).</text>
 <text x="7.62" y="34.29" size="1.778" layer="97">10. Na placa: deixar 6 mm ou mais entre a parte de 127V e o resto do circuito.</text>
+<text x="7.62" y="30.48" size="1.778" layer="97">11. LED2 verde (D0) = sistema OK; LED3 vermelho (D8) = perda de rede (piscando = sem hora).</text>
 <wire x1="182.88" y1="22.86" x2="279.4" y2="22.86" width="0.254" layer="94"/>
 <wire x1="182.88" y1="0" x2="182.88" y2="22.86" width="0.254" layer="94"/>
 <wire x1="182.88" y1="12.7" x2="279.4" y2="12.7" width="0.254" layer="94"/>
 <text x="185.42" y="16.51" size="2.54" layer="94">SINO IFMS - CONTROLADOR DO SINO</text>
-<text x="185.42" y="6.35" size="1.778" layer="94">NodeMCU v3 + DS3231 + rele 5V   Rev. 3   2026-11-13</text>
+<text x="185.42" y="6.35" size="1.778" layer="94">NodeMCU v3 + DS3231 + rele 5V   Rev. 4   2026-11-23</text>
 <text x="185.42" y="2.54" size="1.778" layer="94">Firmware: sino-gps/sino_gps</text>
 </plain>
 <instances>
@@ -935,6 +945,12 @@
 <instance part="GND4" gate="1" x="226.06" y="78.74"/>
 <instance part="GND5" gate="1" x="236.22" y="86.36"/>
 <instance part="GND6" gate="1" x="182.88" y="91.44"/>
+<instance part="R5" gate="G$1" x="246.38" y="170.18"/>
+<instance part="LED2" gate="G$1" x="261.62" y="170.18"/>
+<instance part="R6" gate="G$1" x="246.38" y="154.94"/>
+<instance part="LED3" gate="G$1" x="261.62" y="154.94"/>
+<instance part="GND7" gate="1" x="271.78" y="165.1"/>
+<instance part="GND8" gate="1" x="271.78" y="144.78"/>
 </instances>
 <busses>
 </busses>
@@ -1051,6 +1067,18 @@
 <wire x1="182.88" y1="96.52" x2="182.88" y2="91.44" width="0.1524" layer="91"/>
 <pinref part="GND6" gate="1" pin="GND"/>
 </segment>
+<segment>
+<pinref part="LED2" gate="G$1" pin="C"/>
+<wire x1="266.7" y1="170.18" x2="271.78" y2="170.18" width="0.1524" layer="91"/>
+<wire x1="271.78" y1="170.18" x2="271.78" y2="165.1" width="0.1524" layer="91"/>
+<pinref part="GND7" gate="1" pin="GND"/>
+</segment>
+<segment>
+<pinref part="LED3" gate="G$1" pin="C"/>
+<wire x1="266.7" y1="154.94" x2="271.78" y2="154.94" width="0.1524" layer="91"/>
+<wire x1="271.78" y1="154.94" x2="271.78" y2="144.78" width="0.1524" layer="91"/>
+<pinref part="GND8" gate="1" pin="GND"/>
+</segment>
 </net>
 <net name="+3V3" class="0">
 <segment>
@@ -1122,6 +1150,30 @@
 <pinref part="S1" gate="G$1" pin="1"/>
 <wire x1="167.64" y1="96.52" x2="160.02" y2="96.52" width="0.1524" layer="91"/>
 <label x="160.02" y="96.52" size="1.778" layer="95" rot="R180"/>
+</segment>
+</net>
+<net name="LED_VERDE" class="0">
+<segment>
+<pinref part="U1" gate="G$1" pin="D0/GPIO16"/>
+<wire x1="124.46" y1="132.08" x2="132.08" y2="132.08" width="0.1524" layer="91"/>
+<label x="132.08" y="132.08" size="1.778" layer="95"/>
+</segment>
+<segment>
+<pinref part="R5" gate="G$1" pin="1"/>
+<wire x1="241.3" y1="170.18" x2="233.68" y2="170.18" width="0.1524" layer="91"/>
+<label x="233.68" y="170.18" size="1.778" layer="95" rot="R180"/>
+</segment>
+</net>
+<net name="LED_VERMELHO" class="0">
+<segment>
+<pinref part="U1" gate="G$1" pin="D8/GPIO15"/>
+<wire x1="124.46" y1="106.68" x2="132.08" y2="106.68" width="0.1524" layer="91"/>
+<label x="132.08" y="106.68" size="1.778" layer="95"/>
+</segment>
+<segment>
+<pinref part="R6" gate="G$1" pin="1"/>
+<wire x1="241.3" y1="154.94" x2="233.68" y2="154.94" width="0.1524" layer="91"/>
+<label x="233.68" y="154.94" size="1.778" layer="95" rot="R180"/>
 </segment>
 </net>
 <net name="COLETOR_Q1" class="0">
@@ -1215,6 +1267,20 @@
 <wire x1="182.88" y1="38.1" x2="182.88" y2="45.72" width="0.1524" layer="91"/>
 <wire x1="182.88" y1="45.72" x2="177.8" y2="45.72" width="0.1524" layer="91"/>
 <junction x="251.46" y="53.34"/>
+</segment>
+</net>
+<net name="LED2_ANODO" class="0">
+<segment>
+<pinref part="R5" gate="G$1" pin="2"/>
+<pinref part="LED2" gate="G$1" pin="A"/>
+<wire x1="251.46" y1="170.18" x2="256.54" y2="170.18" width="0.1524" layer="91"/>
+</segment>
+</net>
+<net name="LED3_ANODO" class="0">
+<segment>
+<pinref part="R6" gate="G$1" pin="2"/>
+<pinref part="LED3" gate="G$1" pin="A"/>
+<wire x1="251.46" y1="154.94" x2="256.54" y2="154.94" width="0.1524" layer="91"/>
 </segment>
 </net>
 </nets>
