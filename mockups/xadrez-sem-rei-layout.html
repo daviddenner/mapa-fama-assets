@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Xadrez sem Rei — layout 4:5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#0b0705}
+  #stage{position:relative;width:800px;height:1000px;overflow:hidden;
+    background:
+      radial-gradient(ellipse 75% 60% at 102% 56%, rgba(255,186,105,.20), rgba(255,186,105,0) 70%),
+      linear-gradient(180deg,#130d08 0%,#1b120c 42%,#140c08 58%,#0a0604 100%)}
+  .wall{position:absolute;left:0;top:0;width:800px;height:540px;overflow:hidden;filter:blur(7px);opacity:.92}
+  .shelf{position:absolute;left:-20px;width:840px;height:11px;background:linear-gradient(#2c1d12,#130c07)}
+  .spine{position:absolute;border-radius:1px}
+  .wallshade{position:absolute;left:0;top:0;width:800px;height:640px;
+    background:linear-gradient(180deg,rgba(0,0,0,.35) 0%,rgba(0,0,0,.15) 45%,rgba(10,6,3,.55) 85%,rgba(10,6,3,.95) 100%)}
+  .vignette{position:absolute;inset:0;background:radial-gradient(ellipse 82% 78% at 50% 54%, rgba(0,0,0,0) 48%, rgba(0,0,0,.78) 100%);pointer-events:none}
+  .quote{position:absolute;left:0;right:0;top:158px;text-align:center;color:#d7bd86;
+    font-family:"Cormorant Garamond","EB Garamond","Liberation Serif",serif;font-weight:600;
+    font-size:46px;line-height:1.22;letter-spacing:.055em;text-transform:uppercase;
+    text-shadow:0 0 22px rgba(215,189,134,.22),0 1px 0 rgba(0,0,0,.65)}
+  .quote .lines{display:inline-block;text-align:center}
+  .quote .by{display:block;text-align:right;font-style:italic;font-weight:500;text-transform:none;
+    letter-spacing:.02em;font-size:27px;margin-top:16px;padding-right:4px}
+  svg{position:absolute;left:0;top:0}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="wall" id="wall"></div>
+  <div class="wallshade"></div>
+  <svg id="board" width="800" height="1000" viewBox="0 0 800 1000"></svg>
+  <div class="vignette"></div>
+  <div class="quote"><span class="lines">JAMAIS JOGUE XADREZ<br>COM UM OPONENTE QUE<br>NÃO TEM O REI.<span class="by">— D. Quinelato</span></span></div>
+  <svg id="grain" width="800" height="1000" viewBox="0 0 800 1000" style="mix-blend-mode:overlay;opacity:.10">
+    <filter id="g"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="7"/><feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="800" height="1000" filter="url(#g)"/>
+  </svg>
+</div>
+<script>
+(function(){
+  /* ---------- blurred bookshelves (upper half) ---------- */
+  const wall=document.getElementById('wall');
+  const palette=['#3b1d18','#2c2418','#1e2a2a','#4a2a1b','#2b1a2a','#3a2f1c','#1f1f2e','#452019','#2a2f1f','#33261c','#512a1c','#24201a'];
+  let seed=11; const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280;};
+  [118,292,466].forEach(y=>{
+    let x=-12;
+    while(x<820){
+      const w=9+rnd()*19, h=74+rnd()*58;
+      const d=document.createElement('div'); d.className='spine';
+      d.style.cssText=`left:${x.toFixed(1)}px;top:${(y-h).toFixed(1)}px;width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;background:${palette[Math.floor(rnd()*palette.length)]};opacity:${(0.5+rnd()*0.45).toFixed(2)}`;
+      wall.appendChild(d); x+=w+1+rnd()*3;
+    }
+    const s=document.createElement('div'); s.className='shelf'; s.style.top=y+'px'; wall.appendChild(s);
+  });
+
+  /* ---------- board in perspective, seen from White's side ---------- */
+  const NS='http://www.w3.org/2000/svg';
+  const svg=document.getElementById('board');
+  const el=(n,a,parent)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);(parent||svg).appendChild(e);return e;};
+  const defs=el('defs',{});
+  const grad=(id,c1,c2)=>{const g=el('linearGradient',{id,x1:0,y1:0,x2:1,y2:0},defs);el('stop',{offset:0,'stop-color':c1},g);el('stop',{offset:1,'stop-color':c2},g);};
+  grad('wgrad','#b3956a','#f3e6c8');
+  grad('bgrad','#180c06','#5e3c22');
+  grad('tgrad','#150d08','#2a1a10');
+  [0.5,0.9,1.3,1.7].forEach((s,i)=>{const f=el('filter',{id:'blur'+(i+1),x:'-20%',y:'-20%',width:'140%',height:'140%'},defs);el('feGaussianBlur',{stdDeviation:s},f);});
+  const sh=el('filter',{id:'shadow',x:'-60%',y:'-60%',width:'220%',height:'220%'},defs);el('feGaussianBlur',{stdDeviation:1.7},sh);
+
+  const q=new URLSearchParams(location.search); const num=(k,d)=>q.has(k)?parseFloat(q.get(k)):d;
+  // world: x = files a..h (0..8), y = ranks 1..8 (0..8, rank 1 nearest White), z = up
+  const cam=[num('cx',5.4),num('cy',-5.8),num('cz',5.4)], target=[num('tx',4.0),num('ty',4.2),0];
+  const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+  const norm=a=>{const l=Math.hypot(a[0],a[1],a[2]);return [a[0]/l,a[1]/l,a[2]/l];};
+  const fw=norm(sub(target,cam)), rt=norm(cross(fw,[0,0,1])), upv=cross(rt,fw);
+  const FOCAL=num('f',650), CX=num('sx',400), CY=num('sy',700);
+  const proj=p=>{const d=sub(p,cam);const z=dot(d,fw);return {x:CX+FOCAL*dot(d,rt)/z, y:CY-FOCAL*dot(d,upv)/z, z};};
+  const pts=arr=>arr.map(p=>{const s=proj(p);return s.x.toFixed(2)+','+s.y.toFixed(2);}).join(' ');
+  const poly=(arr,attrs,parent)=>el('polygon',Object.assign({points:pts(arr)},attrs),parent);
+
+  // table, board frame, board edge
+  const tFar=proj([4,10.5,0]).y, tNear=proj([4,8.42,0]).y;
+  const tg=el('linearGradient',{id:'tfade',gradientUnits:'userSpaceOnUse',x1:0,y1:tFar.toFixed(1),x2:0,y2:(tNear+30).toFixed(1)},defs);
+  el('stop',{offset:0,'stop-color':'#1a100a','stop-opacity':0},tg); el('stop',{offset:1,'stop-color':'#2a1a10','stop-opacity':1},tg);
+  poly([[-30,-8,0],[40,-8,0],[40,10.5,0],[-30,10.5,0]],{fill:'url(#tfade)'});
+  poly([[-0.42,-0.42,0],[8.42,-0.42,0],[8.42,8.42,0],[-0.42,8.42,0]],{fill:'#3a2414'});
+  poly([[-0.42,-0.42,0],[8.42,-0.42,0],[8.42,-0.42,-0.28],[-0.42,-0.42,-0.28]],{fill:'#1f120a'});
+  poly([[8.42,-0.42,0],[8.42,8.42,0],[8.42,8.42,-0.28],[8.42,-0.42,-0.28]],{fill:'#2a1810'});
+  poly([[-0.42,-0.42,0],[8.42,-0.42,0],[8.42,8.42,0],[-0.42,8.42,0]],{fill:'none',stroke:'#7a5633','stroke-width':1.1,opacity:.55});
+
+  // squares (a1 dark), faint wood variation, brighter toward the window on the right
+  seed=5;
+  const zFocus=proj([4.5,7.5,0]).z;  // focus plane: e8, the empty square
+  const blurFor=z=>{const b=Math.abs(z-zFocus)*num('bk',0.18);return b<0.35?'':b<0.9?'url(#blur1)':b<1.5?'url(#blur2)':b<2.1?'url(#blur3)':'url(#blur4)';};
+  for(let j=7;j>=0;j--){
+    const g=el('g',{}); const bf=blurFor(proj([4,j+0.5,0]).z); if(bf)g.setAttribute('filter',bf);
+    for(let i=0;i<8;i++){
+      const dark=((i+j)%2===0);
+      const L=(dark?22:58)+(i-3.5)*1.0+(rnd()-0.5)*4;
+      const col=dark?`hsl(22,46%,${L.toFixed(1)}%)`:`hsl(34,40%,${L.toFixed(1)}%)`;
+      poly([[i,j,0],[i+1,j,0],[i+1,j+1,0],[i,j+1,0]],{fill:col,stroke:'rgba(0,0,0,.28)','stroke-width':.4},g);
+    }
+  }
+  // warm window light falling across the board from the right
+  const lc=proj([8.6,4.4,0]);
+  const rg=el('radialGradient',{id:'light',gradientUnits:'userSpaceOnUse',cx:lc.x.toFixed(1),cy:lc.y.toFixed(1),r:'420'},defs);
+  el('stop',{offset:0,'stop-color':'rgba(255,200,120,.22)'},rg); el('stop',{offset:1,'stop-color':'rgba(255,200,120,0)'},rg);
+  poly([[-0.42,-0.42,0],[8.42,-0.42,0],[8.42,8.42,0],[-0.42,8.42,0]],{fill:'url(#light)'});
+  // a soft pool of light on the empty square where the Black King should stand (e8)
+  const ec=proj([4.5,7.5,0]);
+  const rg2=el('radialGradient',{id:'light2',gradientUnits:'userSpaceOnUse',cx:ec.x.toFixed(1),cy:ec.y.toFixed(1),r:'80'},defs);
+  el('stop',{offset:0,'stop-color':'rgba(255,215,150,.18)'},rg2); el('stop',{offset:1,'stop-color':'rgba(255,215,150,0)'},rg2);
+  poly([[-0.42,-0.42,0],[8.42,-0.42,0],[8.42,8.42,0],[-0.42,8.42,0]],{fill:'url(#light2)'});
+
+  // pieces: starting position, Black has NO king (e8 empty). Uppercase = White, lowercase = Black.
+  const glyph={K:'♚',Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟'};
+  const height={K:1.32,Q:1.20,B:1.04,N:0.96,R:0.90,P:0.74};
+  const rows={7:'rnbq.bnr',6:'pppppppp',1:'PPPPPPPP',0:'RNBQKBNR'};
+  const counts={white:0,black:0}; const placed=[];
+  for(let j=7;j>=0;j--){
+    const row=rows[j]; if(!row)continue;
+    for(let i=0;i<8;i++){
+      const c=row[i]; if(c==='.')continue;
+      const white=(c===c.toUpperCase()); const t=c.toUpperCase();
+      const pb=proj([i+0.5,j+0.5,0]), pt=proj([i+0.5,j+0.5,height[t]]);
+      const s=FOCAL/pb.z, h=pb.y-pt.y;
+      const g=el('g',{}); const bf=blurFor(pb.z); if(bf)g.setAttribute('filter',bf);
+      el('ellipse',{cx:(pb.x-0.24*s).toFixed(2),cy:(pb.y-0.01*s).toFixed(2),rx:(0.40*s).toFixed(2),ry:(0.13*s).toFixed(2),fill:'#000',opacity:.45,filter:'url(#shadow)'},g);
+      const tx=el('text',{x:pb.x.toFixed(2),y:(pb.y+0.015*s).toFixed(2),'text-anchor':'middle',
+        'font-family':'"FreeSerif","DejaVu Sans",sans-serif','font-size':(h*1.22).toFixed(2),
+        fill:white?'url(#wgrad)':'url(#bgrad)',stroke:white?'#4a3520':'rgba(228,198,150,.55)','stroke-width':white?0.5:0.45,'paint-order':'stroke'},g);
+      tx.textContent=glyph[t];
+      counts[white?'white':'black']++; placed.push((white?'w':'b')+t+'abcdefgh'[i]+(j+1));
+    }
+  }
+  window.__layout={counts,placed,e8:rows[7][4]==='.'?'empty':'occupied',
+    boardFar:proj([4,8.42,0]).y.toFixed(0),boardNear:proj([4,-0.42,0]).y.toFixed(0),
+    nearLeft:proj([-0.42,-0.42,0]).x.toFixed(0),nearRight:proj([8.42,-0.42,0]).x.toFixed(0)};
+})();
+</script>
+</body>
+</html>
